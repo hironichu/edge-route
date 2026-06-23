@@ -48,6 +48,8 @@ Release OCI resources only after local nft rollback is complete and callers have
 edge oracle ip release --public-ip-id <public_ip_ocid> --private-ip-id <private_ip_ocid>
 ```
 
+If the mapping reused an existing reserved public IP, unassign that public IP from the EdgeRoute private IP instead of deleting it. Delete only the private IP that EdgeRoute created for the failed mapping, then verify no NSG ingress rules remain for the old public port.
+
 If database state is lost, recover OCIDs from `edge map list`, OCI Console, or:
 
 ```sh
@@ -99,4 +101,3 @@ sudo systemctl status edge-agent --no-pager
 ```
 
 Keep the pre-recovery nft and SQLite snapshots until traffic has been verified from an external client.
-

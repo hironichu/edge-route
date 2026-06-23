@@ -4,7 +4,7 @@ use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-use edge_core::{EdgeConfig, EdgeCoreError, EventLevel, GenerationStatus, MappingStatus};
+use edge_core::{EdgeConfig, EdgeCoreError, EventLevel, GenerationStatus, MappingStatus, Protocol};
 use edge_linux::Linux;
 use edge_nft::{render_nftables, Nft, NftRenderConfig};
 use edge_store::SqliteStore;
@@ -175,7 +175,7 @@ impl Reconciler {
                 )
                 .await?;
             for mapping in mappings.iter().filter(|mapping| mapping.enabled) {
-                match tcp_health(mapping.target_ip, mapping.target_port).await {
+                match health_check(mapping.target_ip, mapping.target_port, mapping.protocol).await {
                     Ok(status) => {
                         store
                             .set_mapping_health(
@@ -279,10 +279,14 @@ impl Reconciler {
     }
 }
 
-async fn tcp_health(
+async fn health_check(
     target_ip: std::net::Ipv4Addr,
     target_port: Option<u16>,
+    protocol: Protocol,
 ) -> Result<&'static str> {
+    if protocol == Protocol::Udp {
+        return Ok("udp_unchecked");
+    }
     let Some(port) = target_port else {
         return Ok("ok");
     };

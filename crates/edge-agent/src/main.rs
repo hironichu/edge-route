@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
 use clap::Parser;
-use edge_core::EdgeConfig;
+use edge_core::{EdgeConfig, OciAuthMode};
 use edge_store::SqliteStore;
 use ipnet::Ipv4Net;
 use serde::Deserialize;
@@ -106,6 +106,8 @@ struct FileConfig {
     oci_vnic_id: Option<String>,
     oci_subnet_id: Option<String>,
     oci_nsg_ids: Option<Vec<String>>,
+    oci_region: Option<String>,
+    oci_auth: Option<OciAuthMode>,
     api_token: Option<String>,
 }
 
@@ -136,6 +138,10 @@ fn load_config(
     config.oci_vnic_id = file.oci_vnic_id;
     config.oci_subnet_id = file.oci_subnet_id;
     config.oci_nsg_ids = file.oci_nsg_ids.unwrap_or_default();
+    config.oci_region = file.oci_region;
+    if let Some(value) = file.oci_auth {
+        config.oci_auth = value;
+    }
     config.api_token = file.api_token;
     Ok(config)
 }

@@ -10,4 +10,9 @@ home_cidrs = ["192.168.20.0/24"]
 # oci_compartment_id = "ocid1.compartment..."
 # oci_vnic_id = "ocid1.vnic..."
 # oci_subnet_id = "ocid1.subnet..."
+# oci_region = "eu-paris-1"
+# oci_auth = "instance_principal" # or "api_key"; API key secret paths come from env
+
+# Optional NSGs where EdgeRoute may add explicit ingress rules for port forwards.
+# Empty means EdgeRoute will not mutate OCI security rules.
 # oci_nsg_ids = ["ocid1.networksecuritygroup..."]

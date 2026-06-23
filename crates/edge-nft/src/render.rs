@@ -1,5 +1,5 @@
 use edge_core::validation::validate_mappings;
-use edge_core::{EdgeConfig, Mapping, MappingMode};
+use edge_core::{EdgeConfig, Mapping, MappingMode, Protocol};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NftRenderConfig {
@@ -21,9 +21,13 @@ pub fn render_nftables(
 ) -> edge_core::Result<String> {
     validate_mappings(mappings, edge_config)?;
 
-    let active: Vec<&Mapping> = mappings
+    let one_to_one: Vec<&Mapping> = mappings
         .iter()
         .filter(|mapping| mapping.enabled && mapping.mode == MappingMode::OneToOneSnat)
+        .collect();
+    let port_forwards: Vec<&Mapping> = mappings
+        .iter()
+        .filter(|mapping| mapping.enabled && mapping.mode == MappingMode::PortForwardSnat)
         .collect();
 
     let mut output = String::new();
@@ -36,7 +40,7 @@ pub fn render_nftables(
     output.push_str("        type ipv4_addr : ipv4_addr;\n");
     output.push_str("        elements = {\n");
 
-    for mapping in active {
+    for mapping in one_to_one {
         output.push_str(&format!(
             "            {} : {},\n",
             mapping.edge_private_ip, mapping.target_ip
@@ -47,6 +51,30 @@ pub fn render_nftables(
     output.push_str("    }\n\n");
     output.push_str("    chain prerouting {\n");
     output.push_str("        type nat hook prerouting priority dstnat; policy accept;\n\n");
+    for mapping in port_forwards {
+        let protocol = nft_protocol(mapping.protocol);
+        let public_port = mapping.public_port.expect("validated public_port");
+        let target_port = mapping.target_port.expect("validated target_port");
+        output.push_str("        iifname \"");
+        output.push_str(&edge_config.wan_interface);
+        output.push_str("\" ip daddr ");
+        output.push_str(&mapping.edge_private_ip.to_string());
+        output.push(' ');
+        output.push_str(protocol);
+        output.push_str(" dport ");
+        output.push_str(&public_port.to_string());
+        output.push_str(" dnat to ");
+        output.push_str(&mapping.target_ip.to_string());
+        output.push(':');
+        output.push_str(&target_port.to_string());
+        output.push('\n');
+    }
+    if !mappings
+        .iter()
+        .any(|mapping| mapping.enabled && mapping.mode == MappingMode::OneToOneSnat)
+    {
+        output.push('\n');
+    }
     output.push_str("        dnat to ip daddr map @edge_to_target\n");
     output.push_str("    }\n\n");
     output.push_str("    chain postrouting {\n");
@@ -63,9 +91,17 @@ pub fn render_nftables(
     Ok(output)
 }
 
+fn nft_protocol(protocol: Protocol) -> &'static str {
+    match protocol {
+        Protocol::Tcp => "tcp",
+        Protocol::Udp => "udp",
+        Protocol::All => unreachable!("port-forward mappings cannot use protocol=all"),
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use edge_core::{EdgeConfig, Mapping};
+    use edge_core::{EdgeConfig, Mapping, MappingMode, Protocol};
 
     use super::*;
 
@@ -90,5 +126,41 @@ mod tests {
         assert!(rendered.contains("10.0.0.101 : 192.168.20.42,"));
         assert!(rendered.contains("dnat to ip daddr map @edge_to_target"));
         assert!(rendered.contains("oifname \"tailscale0\" ip daddr 192.168.20.0/24 masquerade"));
+    }
+
+    #[test]
+    fn renders_port_forward_rules() {
+        let config = EdgeConfig::new("ens3", "tailscale0", vec!["10.10.40.0/24".parse().unwrap()]);
+        let mut tcp = Mapping::new(
+            "mysql",
+            Some("8.8.8.8".parse().unwrap()),
+            "10.0.0.101".parse().unwrap(),
+            "10.10.40.60".parse().unwrap(),
+        );
+        tcp.mode = MappingMode::PortForwardSnat;
+        tcp.protocol = Protocol::Tcp;
+        tcp.public_port = Some(13306);
+        tcp.target_port = Some(3306);
+
+        let mut udp = Mapping::new(
+            "udp_service",
+            Some("8.8.8.8".parse().unwrap()),
+            "10.0.0.101".parse().unwrap(),
+            "10.10.40.60".parse().unwrap(),
+        );
+        udp.mode = MappingMode::PortForwardSnat;
+        udp.protocol = Protocol::Udp;
+        udp.public_port = Some(14444);
+        udp.target_port = Some(4444);
+
+        let rendered = render_nftables(&[tcp, udp], &config, &NftRenderConfig::default()).unwrap();
+
+        assert!(rendered.contains(
+            "iifname \"ens3\" ip daddr 10.0.0.101 tcp dport 13306 dnat to 10.10.40.60:3306"
+        ));
+        assert!(rendered.contains(
+            "iifname \"ens3\" ip daddr 10.0.0.101 udp dport 14444 dnat to 10.10.40.60:4444"
+        ));
+        assert!(rendered.contains("oifname \"tailscale0\" ip daddr 10.10.40.0/24 masquerade"));
     }
 }

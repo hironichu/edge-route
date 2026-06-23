@@ -8,7 +8,7 @@ use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::{Json, Router};
-use edge_core::{EdgeConfig, EdgeCoreError, Mapping, MappingId};
+use edge_core::{EdgeConfig, EdgeCoreError, Mapping, MappingId, MappingMode, Protocol};
 use edge_nft::{render_nftables, NftRenderConfig};
 use edge_reconcile::{ReconcileOptions, Reconciler};
 use edge_store::SqliteStore;
@@ -74,7 +74,10 @@ async fn create_mapping(
         request.edge_private_ip,
         request.target_ip,
     );
+    mapping.public_port = request.public_port;
     mapping.target_port = request.target_port;
+    mapping.mode = request.mode.unwrap_or_default();
+    mapping.protocol = request.protocol.unwrap_or_default();
     state.store.insert_mapping(&mapping).await?;
     Ok(Json(mapping))
 }
@@ -231,7 +234,10 @@ struct CreateMappingRequest {
     public_ip: Option<Ipv4Addr>,
     edge_private_ip: Ipv4Addr,
     target_ip: Ipv4Addr,
+    public_port: Option<u16>,
     target_port: Option<u16>,
+    mode: Option<MappingMode>,
+    protocol: Option<Protocol>,
 }
 
 #[derive(Debug, Deserialize)]

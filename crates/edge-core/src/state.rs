@@ -4,18 +4,19 @@ use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
 
 use crate::errors::{EdgeCoreError, Result};
-use crate::mapping::{EdgeConfig, Mapping, MappingId, MappingStatus};
-use crate::validation::{validate_edge_config, validate_mapping};
+use crate::mapping::{EdgeConfig, Mapping, MappingId, MappingMode, MappingStatus};
+use crate::validation::{conflicts, validate_edge_config, validate_mapping};
 
 pub const SQLITE_SCHEMA: &str = r#"
 CREATE TABLE IF NOT EXISTS mappings (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
-    public_ip TEXT UNIQUE,
+    public_ip TEXT,
     oci_public_ip_ocid TEXT,
-    edge_private_ip TEXT NOT NULL UNIQUE,
+    edge_private_ip TEXT NOT NULL,
     oci_private_ip_ocid TEXT,
     target_ip TEXT NOT NULL,
+    public_port INTEGER,
     target_port INTEGER,
     protocol TEXT NOT NULL DEFAULT 'all',
     mode TEXT NOT NULL DEFAULT 'one_to_one_snat',
@@ -161,19 +162,23 @@ impl InMemoryStateStore {
             }
 
             if let Some(public_ip) = candidate.public_ip {
-                if existing.public_ip == Some(public_ip) {
+                if existing.public_ip == Some(public_ip)
+                    && (existing.mode == MappingMode::OneToOneSnat
+                        || candidate.mode == MappingMode::OneToOneSnat)
+                {
                     return Err(EdgeCoreError::DuplicatePublicIp(public_ip));
                 }
             }
 
-            if existing.edge_private_ip == candidate.edge_private_ip {
+            if existing.mode == MappingMode::OneToOneSnat
+                && candidate.mode == MappingMode::OneToOneSnat
+                && existing.target_ip == candidate.target_ip
+            {
+                return Err(EdgeCoreError::DuplicateTargetIp(candidate.target_ip));
+            } else if conflicts(existing, candidate) {
                 return Err(EdgeCoreError::DuplicateEdgePrivateIp(
                     candidate.edge_private_ip,
                 ));
-            }
-
-            if existing.target_ip == candidate.target_ip {
-                return Err(EdgeCoreError::DuplicateTargetIp(candidate.target_ip));
             }
         }
 

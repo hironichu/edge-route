@@ -4,7 +4,9 @@ use std::str::FromStr;
 
 use anyhow::{Context, Result};
 use clap::{Args, Parser, Subcommand};
-use edge_core::{EdgeConfig, Mapping, MappingId, MappingStatus};
+use edge_core::{
+    EdgeConfig, Mapping, MappingId, MappingMode, MappingStatus, OciAuthMode, Protocol,
+};
 use edge_nft::{render_nftables, NftRenderConfig};
 use edge_oci::OciCli;
 use edge_reconcile::{ReconcileOptions, Reconciler};
@@ -81,7 +83,16 @@ struct CreateMappingArgs {
     public_ip: Option<Ipv4Addr>,
 
     #[arg(long)]
+    public_port: Option<u16>,
+
+    #[arg(long)]
     target_port: Option<u16>,
+
+    #[arg(long, default_value = "one_to_one_snat")]
+    mode: MappingMode,
+
+    #[arg(long, default_value = "all")]
+    protocol: Protocol,
 
     #[arg(long)]
     name: Option<String>,
@@ -228,14 +239,26 @@ async fn handle_map(command: MapCommand, store: &SqliteStore, config: &EdgeConfi
                 .name
                 .unwrap_or_else(|| format!("target_{}", args.target).replace('.', "_"));
             let mut mapping = Mapping::new(name, args.public_ip, args.edge_private_ip, args.target);
+            mapping.public_port = args.public_port;
             mapping.target_port = args.target_port;
+            mapping.mode = args.mode;
+            mapping.protocol = args.protocol;
             store.insert_mapping(&mapping).await?;
             println!("Created mapping: {}", mapping.id);
             if let Some(public_ip) = mapping.public_ip {
-                println!("Public IP: {public_ip}");
+                let public_port = mapping
+                    .public_port
+                    .map(|port| format!(":{port}"))
+                    .unwrap_or_default();
+                println!("Public IP: {public_ip}{public_port}");
             }
             println!("Edge private IP: {}", mapping.edge_private_ip);
-            println!("Target IP: {}", mapping.target_ip);
+            let target_port = mapping
+                .target_port
+                .map(|port| format!(":{port}"))
+                .unwrap_or_default();
+            println!("Target IP: {}{}", mapping.target_ip, target_port);
+            println!("Mode: {:?} {:?}", mapping.mode, mapping.protocol);
             println!("Status: {:?}", mapping.status);
         }
         MapCommand::List => {
@@ -560,16 +583,25 @@ async fn handle_status(store: &SqliteStore, config: &EdgeConfig) -> Result<()> {
 }
 
 fn print_mapping_line(mapping: &Mapping) {
-    let public_ip = mapping
+    let mut public_ip = mapping
         .public_ip
         .map(|ip| ip.to_string())
         .unwrap_or_else(|| "-".to_owned());
+    if let Some(port) = mapping.public_port {
+        public_ip.push_str(&format!(":{port}"));
+    }
+    let mut target = mapping.target_ip.to_string();
+    if let Some(port) = mapping.target_port {
+        target.push_str(&format!(":{port}"));
+    }
     println!(
-        "{}\t{}\t{}\t{}\t{:?}\tenabled={}",
+        "{}\t{}\t{}\t{}\t{:?}/{:?}\t{:?}\tenabled={}",
         mapping.id,
         public_ip,
         mapping.edge_private_ip,
-        mapping.target_ip,
+        target,
+        mapping.mode,
+        mapping.protocol,
         mapping.status,
         mapping.enabled
     );
@@ -584,6 +616,8 @@ struct FileConfig {
     oci_vnic_id: Option<String>,
     oci_subnet_id: Option<String>,
     oci_nsg_ids: Option<Vec<String>>,
+    oci_region: Option<String>,
+    oci_auth: Option<OciAuthMode>,
     api_token: Option<String>,
 }
 
@@ -614,6 +648,10 @@ fn load_config(
     config.oci_vnic_id = file.oci_vnic_id;
     config.oci_subnet_id = file.oci_subnet_id;
     config.oci_nsg_ids = file.oci_nsg_ids.unwrap_or_default();
+    config.oci_region = file.oci_region;
+    if let Some(value) = file.oci_auth {
+        config.oci_auth = value;
+    }
     config.api_token = file.api_token;
     Ok(config)
 }
