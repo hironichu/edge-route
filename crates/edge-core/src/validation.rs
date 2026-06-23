@@ -54,6 +54,11 @@ pub fn validate_mapping(mapping: &Mapping, config: &EdgeConfig) -> Result<()> {
                     "one-to-one mappings cannot set public_port",
                 ));
             }
+            if mapping.target_port == Some(0) {
+                return Err(EdgeCoreError::validation(
+                    "target port must be between 1 and 65535",
+                ));
+            }
             if mapping.protocol != Protocol::All {
                 return Err(EdgeCoreError::validation(
                     "one-to-one mappings must use protocol=all",
@@ -65,6 +70,28 @@ pub fn validate_mapping(mapping: &Mapping, config: &EdgeConfig) -> Result<()> {
                 return Err(EdgeCoreError::validation(
                     "port-forward mappings require public_port",
                 ));
+            }
+            if mapping.public_port == Some(0) {
+                return Err(EdgeCoreError::validation(
+                    "public port must be between 1 and 65535",
+                ));
+            }
+            if mapping.target_port.is_none() {
+                return Err(EdgeCoreError::validation(
+                    "port-forward mappings require target_port",
+                ));
+            }
+            if mapping.target_port == Some(0) {
+                return Err(EdgeCoreError::validation(
+                    "target port must be between 1 and 65535",
+                ));
+            }
+            if mapping.protocol == Protocol::All {
+                return Err(EdgeCoreError::validation(
+                    "port-forward mappings must use protocol=tcp or protocol=udp",
+                ));
+            }
+        }
             }
             if mapping.target_port.is_none() {
                 return Err(EdgeCoreError::validation(
