@@ -68,9 +68,7 @@ impl SqliteStore {
             return Ok(());
         };
         let sql: String = row.get("sql");
-        if !sql.contains("public_ip TEXT UNIQUE")
-            && !sql.contains("edge_private_ip TEXT NOT NULL UNIQUE")
-        {
+        if !sql.contains("UNIQUE") {
             return Ok(());
         }
 
