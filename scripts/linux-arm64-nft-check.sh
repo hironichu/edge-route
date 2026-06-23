@@ -26,11 +26,17 @@ esac
 command -v nft >/dev/null 2>&1 || die "nft command not found"
 "$script_dir/nft-min-check.sh"
 
+nft_cmd=(nft)
+if [ "${EDGE_NFT_USE_SUDO:-0}" = "1" ]; then
+    command -v sudo >/dev/null 2>&1 || die "sudo command not found"
+    nft_cmd=(sudo nft)
+fi
+
 if [ "${1:-}" = "parse-only" ]; then
     rules="${2:-${EDGE_NFT_FILE:-/tmp/edge-router-generated.nft}}"
     [ -r "$rules" ] || die "rules file not readable: $rules"
-    nft --version
-    nft -c -f "$rules"
+    "${nft_cmd[@]}" --version
+    "${nft_cmd[@]}" -c -f "$rules"
     echo "nft generated rules check ok: $rules"
     exit 0
 fi
@@ -57,6 +63,6 @@ cargo run -q --manifest-path "$repo_root/Cargo.toml" -p edge-cli -- \
     --home-cidr "${EDGE_HOME_CIDR:-192.168.20.0/24}" \
     apply --dry-run >"$generated"
 
-nft --version
-nft -c -f "$generated"
+"${nft_cmd[@]}" --version
+"${nft_cmd[@]}" -c -f "$generated"
 echo "nft generated rules check ok"

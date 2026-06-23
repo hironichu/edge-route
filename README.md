@@ -10,9 +10,15 @@ cargo build --release -p edge-cli -p edge-agent
 ./scripts/nft-min-check.sh
 ```
 
+CI/CD:
+
+- Pull requests and pushes run Rust formatting, clippy, tests, release builds, nft parser checks, and XDP dry-run safety checks on Linux x86_64 and arm64.
+- Tags matching `v*` build Linux x86_64 and arm64 release tarballs for `edge` and `edge-agent`.
+
 Operator docs:
 
 - [Deployment](docs/deployment.md)
+- [CI/CD](docs/ci.md)
 - [Experimental XDP backend](docs/xdp.md)
 - [Recovery](docs/recovery.md)
 - [Config example](config/config.example.toml)

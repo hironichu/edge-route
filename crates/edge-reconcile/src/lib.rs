@@ -71,18 +71,10 @@ pub struct ReconcileReport {
     pub xdp_plan_entries: usize,
 }
 
+#[derive(Default)]
 pub struct Reconciler {
     linux: Linux,
     nft: Nft,
-}
-
-impl Default for Reconciler {
-    fn default() -> Self {
-        Self {
-            linux: Linux::default(),
-            nft: Nft::default(),
-        }
-    }
 }
 
 impl Reconciler {

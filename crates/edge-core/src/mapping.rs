@@ -47,18 +47,13 @@ impl FromStr for MappingId {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Protocol {
+    #[default]
     All,
     Tcp,
     Udp,
-}
-
-impl Default for Protocol {
-    fn default() -> Self {
-        Self::All
-    }
 }
 
 impl FromStr for Protocol {
@@ -76,17 +71,12 @@ impl FromStr for Protocol {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum MappingMode {
+    #[default]
     OneToOneSnat,
     PortForwardSnat,
-}
-
-impl Default for MappingMode {
-    fn default() -> Self {
-        Self::OneToOneSnat
-    }
 }
 
 impl FromStr for MappingMode {
@@ -103,18 +93,13 @@ impl FromStr for MappingMode {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum MappingBackend {
+    #[default]
     Nft,
     Xdp,
     Proxy,
-}
-
-impl Default for MappingBackend {
-    fn default() -> Self {
-        Self::Nft
-    }
 }
 
 impl FromStr for MappingBackend {
@@ -132,9 +117,10 @@ impl FromStr for MappingBackend {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum MappingStatus {
+    #[default]
     Pending,
     Active,
     Disabled,
@@ -142,23 +128,12 @@ pub enum MappingStatus {
     Error,
 }
 
-impl Default for MappingStatus {
-    fn default() -> Self {
-        Self::Pending
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum OciAuthMode {
+    #[default]
     InstancePrincipal,
     ApiKey,
-}
-
-impl Default for OciAuthMode {
-    fn default() -> Self {
-        Self::InstancePrincipal
-    }
 }
 
 impl FromStr for OciAuthMode {
