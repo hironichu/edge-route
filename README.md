@@ -1,6 +1,6 @@
 # EdgeRoute
 
-EdgeRoute is a Linux edge router controller for mapping OCI public/private IPs to home-network targets reachable through Tailscale. It stores mappings in SQLite, renders nftables NAT rules, and can validate rules before applying them.
+EdgeRoute is a Linux edge router controller for mapping OCI public/private IPs to home-network targets reachable through Tailscale. It stores mappings in SQLite, renders nftables NAT rules, and can validate rules before applying them. The default and only live data plane today is `nft`; an experimental `xdp` backend can build dry-run forwarding plans but intentionally refuses live apply until an eBPF loader/attach path exists.
 
 Core commands:
 
@@ -13,6 +13,7 @@ cargo build --release -p edge-cli -p edge-agent
 Operator docs:
 
 - [Deployment](docs/deployment.md)
+- [Experimental XDP backend](docs/xdp.md)
 - [Recovery](docs/recovery.md)
 - [Config example](config/config.example.toml)
 

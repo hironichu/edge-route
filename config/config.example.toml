@@ -16,3 +16,7 @@ home_cidrs = ["192.168.20.0/24"]
 # Optional NSGs where EdgeRoute may add explicit ingress rules for port forwards.
 # Empty means EdgeRoute will not mutate OCI security rules.
 # oci_nsg_ids = ["ocid1.networksecuritygroup..."]
+
+# Experimental XDP planning is configured per command/API request for now:
+#   edge reconcile --dry-run --enable-xdp --xdp-interface ens3 --xdp-pin-path /sys/fs/bpf/edgeroute
+# There is no persistent XDP TOML config yet, and XDP live apply is intentionally unsupported.
