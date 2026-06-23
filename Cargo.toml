@@ -9,6 +9,7 @@ members = [
     "crates/edge-reconcile",
     "crates/edge-store",
     "crates/edge-tailscale",
+    "crates/edge-xdp",
 ]
 resolver = "2"
 

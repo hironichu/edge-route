@@ -381,6 +381,7 @@ dependencies = [
  "edge-reconcile",
  "edge-store",
  "edge-tailscale",
+ "edge-xdp",
  "ipnet",
  "serde",
  "tokio",
@@ -402,6 +403,7 @@ dependencies = [
  "edge-reconcile",
  "edge-store",
  "edge-tailscale",
+ "edge-xdp",
  "ipnet",
  "serde",
  "serde_json",
@@ -456,6 +458,7 @@ dependencies = [
  "edge-linux",
  "edge-nft",
  "edge-store",
+ "edge-xdp",
  "tempfile",
  "thiserror 1.0.69",
  "time",
@@ -484,6 +487,15 @@ dependencies = [
  "serde_json",
  "thiserror 1.0.69",
  "tokio",
+]
+
+[[package]]
+name = "edge-xdp"
+version = "0.1.0"
+dependencies = [
+ "edge-core",
+ "serde",
+ "thiserror 1.0.69",
 ]
 
 [[package]]

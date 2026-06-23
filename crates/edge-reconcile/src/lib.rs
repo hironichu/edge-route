@@ -4,10 +4,14 @@ use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-use edge_core::{EdgeConfig, EdgeCoreError, EventLevel, GenerationStatus, MappingStatus, Protocol};
+use edge_core::{
+    EdgeConfig, EdgeCoreError, EventLevel, GenerationStatus, MappingBackend, MappingStatus,
+    Protocol,
+};
 use edge_linux::Linux;
 use edge_nft::{render_nftables, Nft, NftRenderConfig};
 use edge_store::SqliteStore;
+use edge_xdp::{XdpConfig, XdpPlugin};
 use thiserror::Error;
 use time::OffsetDateTime;
 use tokio::net::TcpStream;
@@ -31,6 +35,10 @@ pub enum ReconcileError {
     NftApply(String),
     #[error("health check failed: {0}")]
     Health(String),
+    #[error("xdp operation failed: {0}")]
+    Xdp(#[from] edge_xdp::XdpError),
+    #[error("xdp apply is not implemented; run dry-run to inspect the XDP plan")]
+    XdpApplyUnsupported,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -39,6 +47,7 @@ pub struct ReconcileOptions {
     pub dry_run: bool,
     pub apply_nft: bool,
     pub apply_linux: bool,
+    pub xdp: XdpConfig,
 }
 
 impl Default for ReconcileOptions {
@@ -48,6 +57,7 @@ impl Default for ReconcileOptions {
             dry_run: false,
             apply_nft: true,
             apply_linux: true,
+            xdp: XdpConfig::disabled(""),
         }
     }
 }
@@ -58,6 +68,7 @@ pub struct ReconcileReport {
     pub generation_id: Option<i64>,
     pub added_addresses: Vec<String>,
     pub removed_addresses: Vec<String>,
+    pub xdp_plan_entries: usize,
 }
 
 pub struct Reconciler {
@@ -87,13 +98,18 @@ impl Reconciler {
     ) -> Result<ReconcileReport> {
         let mappings = store.list_mappings().await?;
         let rendered = render_nftables(&mappings, config, &NftRenderConfig::default())?;
+        let xdp_plan = XdpPlugin::new(options.xdp.clone()).plan(&mappings, config)?;
         if options.dry_run {
             return Ok(ReconcileReport {
                 nftables_config: rendered,
                 generation_id: None,
                 added_addresses: Vec::new(),
                 removed_addresses: Vec::new(),
+                xdp_plan_entries: xdp_plan.entries.len(),
             });
+        }
+        if !xdp_plan.is_empty() {
+            return Err(ReconcileError::XdpApplyUnsupported);
         }
 
         let _rendered_generation = store
@@ -147,7 +163,7 @@ impl Reconciler {
         let mut removed_addresses = Vec::new();
         if options.apply_linux {
             for mapping in &mappings {
-                if mapping.enabled {
+                if mapping.enabled && mapping.backend == MappingBackend::Nft {
                     if self
                         .linux
                         .ensure_addr(&config.wan_interface, mapping.edge_private_ip)
@@ -155,10 +171,11 @@ impl Reconciler {
                     {
                         added_addresses.push(mapping.edge_private_ip.to_string());
                     }
-                } else if self
-                    .linux
-                    .delete_addr_if_present(&config.wan_interface, mapping.edge_private_ip)
-                    .await?
+                } else if mapping.backend == MappingBackend::Nft
+                    && self
+                        .linux
+                        .delete_addr_if_present(&config.wan_interface, mapping.edge_private_ip)
+                        .await?
                 {
                     removed_addresses.push(mapping.edge_private_ip.to_string());
                 }
@@ -174,7 +191,10 @@ impl Reconciler {
                     None,
                 )
                 .await?;
-            for mapping in mappings.iter().filter(|mapping| mapping.enabled) {
+            for mapping in mappings
+                .iter()
+                .filter(|mapping| mapping.enabled && mapping.backend == MappingBackend::Nft)
+            {
                 match health_check(mapping.target_ip, mapping.target_port, mapping.protocol).await {
                     Ok(status) => {
                         store
@@ -233,6 +253,7 @@ impl Reconciler {
             generation_id: Some(generation_id),
             added_addresses,
             removed_addresses,
+            xdp_plan_entries: xdp_plan.entries.len(),
         })
     }
 
@@ -325,6 +346,7 @@ fn atomic_write(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use edge_core::{Mapping, MappingBackend, MappingMode};
 
     #[test]
     fn atomic_write_replaces_file() {
@@ -335,5 +357,67 @@ mod tests {
         atomic_write(&path, b"second").unwrap();
 
         assert_eq!(std::fs::read_to_string(path).unwrap(), "second");
+    }
+
+    #[tokio::test]
+    async fn dry_run_reports_xdp_plan_entries() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = SqliteStore::connect(dir.path().join("state.sqlite"))
+            .await
+            .unwrap();
+        let config = EdgeConfig::new("ens3", "tailscale0", vec!["10.10.40.0/24".parse().unwrap()]);
+        store.set_edge_config(&config).await.unwrap();
+        store.insert_mapping(&xdp_mapping()).await.unwrap();
+        let options = ReconcileOptions {
+            dry_run: true,
+            xdp: XdpConfig::enabled("ens3", "/sys/fs/bpf/edgeroute"),
+            ..ReconcileOptions::default()
+        };
+
+        let report = Reconciler::default()
+            .reconcile(&store, &config, &options)
+            .await
+            .unwrap();
+
+        assert_eq!(report.xdp_plan_entries, 1);
+        assert!(report.nftables_config.contains("table ip edge_nat"));
+    }
+
+    #[tokio::test]
+    async fn apply_rejects_xdp_until_loader_exists() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = SqliteStore::connect(dir.path().join("state.sqlite"))
+            .await
+            .unwrap();
+        let config = EdgeConfig::new("ens3", "tailscale0", vec!["10.10.40.0/24".parse().unwrap()]);
+        store.set_edge_config(&config).await.unwrap();
+        store.insert_mapping(&xdp_mapping()).await.unwrap();
+        let options = ReconcileOptions {
+            nft_output: dir.path().join("generated.nft"),
+            xdp: XdpConfig::enabled("ens3", "/sys/fs/bpf/edgeroute"),
+            ..ReconcileOptions::default()
+        };
+
+        let err = Reconciler::default()
+            .reconcile(&store, &config, &options)
+            .await
+            .unwrap_err();
+
+        assert!(matches!(err, ReconcileError::XdpApplyUnsupported));
+    }
+
+    fn xdp_mapping() -> Mapping {
+        let mut mapping = Mapping::new(
+            "mysql",
+            Some("8.8.8.8".parse().unwrap()),
+            "10.0.0.101".parse().unwrap(),
+            "10.10.40.60".parse().unwrap(),
+        );
+        mapping.mode = MappingMode::PortForwardSnat;
+        mapping.backend = MappingBackend::Xdp;
+        mapping.protocol = Protocol::Tcp;
+        mapping.public_port = Some(13306);
+        mapping.target_port = Some(3306);
+        mapping
     }
 }

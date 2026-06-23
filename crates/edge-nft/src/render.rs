@@ -1,5 +1,5 @@
 use edge_core::validation::validate_mappings;
-use edge_core::{EdgeConfig, Mapping, MappingMode, Protocol};
+use edge_core::{EdgeConfig, Mapping, MappingBackend, MappingMode, Protocol};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NftRenderConfig {
@@ -23,11 +23,19 @@ pub fn render_nftables(
 
     let one_to_one: Vec<&Mapping> = mappings
         .iter()
-        .filter(|mapping| mapping.enabled && mapping.mode == MappingMode::OneToOneSnat)
+        .filter(|mapping| {
+            mapping.enabled
+                && mapping.backend == MappingBackend::Nft
+                && mapping.mode == MappingMode::OneToOneSnat
+        })
         .collect();
     let port_forwards: Vec<&Mapping> = mappings
         .iter()
-        .filter(|mapping| mapping.enabled && mapping.mode == MappingMode::PortForwardSnat)
+        .filter(|mapping| {
+            mapping.enabled
+                && mapping.backend == MappingBackend::Nft
+                && mapping.mode == MappingMode::PortForwardSnat
+        })
         .collect();
 
     let mut output = String::new();
@@ -69,10 +77,11 @@ pub fn render_nftables(
         output.push_str(&target_port.to_string());
         output.push('\n');
     }
-    if !mappings
-        .iter()
-        .any(|mapping| mapping.enabled && mapping.mode == MappingMode::OneToOneSnat)
-    {
+    if !mappings.iter().any(|mapping| {
+        mapping.enabled
+            && mapping.backend == MappingBackend::Nft
+            && mapping.mode == MappingMode::OneToOneSnat
+    }) {
         output.push('\n');
     }
     output.push_str("        dnat to ip daddr map @edge_to_target\n");
@@ -101,7 +110,7 @@ fn nft_protocol(protocol: Protocol) -> &'static str {
 
 #[cfg(test)]
 mod tests {
-    use edge_core::{EdgeConfig, Mapping, MappingMode, Protocol};
+    use edge_core::{EdgeConfig, Mapping, MappingBackend, MappingMode, Protocol};
 
     use super::*;
 
@@ -126,6 +135,30 @@ mod tests {
         assert!(rendered.contains("10.0.0.101 : 192.168.20.42,"));
         assert!(rendered.contains("dnat to ip daddr map @edge_to_target"));
         assert!(rendered.contains("oifname \"tailscale0\" ip daddr 192.168.20.0/24 masquerade"));
+    }
+
+    #[test]
+    fn explicit_nft_backend_preserves_rendered_output() {
+        let config = EdgeConfig::new(
+            "ens3",
+            "tailscale0",
+            vec!["192.168.20.0/24".parse().unwrap()],
+        );
+        let default_mapping = Mapping::new(
+            "prod_vm_1",
+            None,
+            "10.0.0.101".parse().unwrap(),
+            "192.168.20.42".parse().unwrap(),
+        );
+        let mut explicit_mapping = default_mapping.clone();
+        explicit_mapping.backend = MappingBackend::Nft;
+
+        let default_rendered =
+            render_nftables(&[default_mapping], &config, &NftRenderConfig::default()).unwrap();
+        let explicit_rendered =
+            render_nftables(&[explicit_mapping], &config, &NftRenderConfig::default()).unwrap();
+
+        assert_eq!(default_rendered, explicit_rendered);
     }
 
     #[test]
