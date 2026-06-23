@@ -61,15 +61,45 @@ impl Default for Protocol {
     }
 }
 
+impl FromStr for Protocol {
+    type Err = EdgeCoreError;
+
+    fn from_str(value: &str) -> Result<Self> {
+        match value.trim().to_ascii_lowercase().as_str() {
+            "all" => Ok(Self::All),
+            "tcp" => Ok(Self::Tcp),
+            "udp" => Ok(Self::Udp),
+            other => Err(EdgeCoreError::validation(format!(
+                "unsupported protocol: {other}"
+            ))),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum MappingMode {
     OneToOneSnat,
+    PortForwardSnat,
 }
 
 impl Default for MappingMode {
     fn default() -> Self {
         Self::OneToOneSnat
+    }
+}
+
+impl FromStr for MappingMode {
+    type Err = EdgeCoreError;
+
+    fn from_str(value: &str) -> Result<Self> {
+        match value.trim().to_ascii_lowercase().as_str() {
+            "one_to_one_snat" => Ok(Self::OneToOneSnat),
+            "port_forward_snat" => Ok(Self::PortForwardSnat),
+            other => Err(EdgeCoreError::validation(format!(
+                "unsupported mapping mode: {other}"
+            ))),
+        }
     }
 }
 
@@ -89,6 +119,33 @@ impl Default for MappingStatus {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum OciAuthMode {
+    InstancePrincipal,
+    ApiKey,
+}
+
+impl Default for OciAuthMode {
+    fn default() -> Self {
+        Self::InstancePrincipal
+    }
+}
+
+impl FromStr for OciAuthMode {
+    type Err = EdgeCoreError;
+
+    fn from_str(value: &str) -> Result<Self> {
+        match value.trim().to_ascii_lowercase().as_str() {
+            "instance_principal" => Ok(Self::InstancePrincipal),
+            "api_key" => Ok(Self::ApiKey),
+            other => Err(EdgeCoreError::validation(format!(
+                "unsupported OCI auth mode: {other}"
+            ))),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EdgeConfig {
     pub wan_interface: String,
@@ -99,6 +156,9 @@ pub struct EdgeConfig {
     pub oci_subnet_id: Option<String>,
     #[serde(default)]
     pub oci_nsg_ids: Vec<String>,
+    pub oci_region: Option<String>,
+    #[serde(default)]
+    pub oci_auth: OciAuthMode,
     pub api_token: Option<String>,
 }
 
@@ -116,6 +176,8 @@ impl EdgeConfig {
             oci_vnic_id: None,
             oci_subnet_id: None,
             oci_nsg_ids: Vec::new(),
+            oci_region: None,
+            oci_auth: OciAuthMode::default(),
             api_token: None,
         }
     }
@@ -134,6 +196,7 @@ pub struct Mapping {
     pub edge_private_ip: Ipv4Addr,
     pub oci_private_ip_ocid: Option<String>,
     pub target_ip: Ipv4Addr,
+    pub public_port: Option<u16>,
     pub target_port: Option<u16>,
     pub protocol: Protocol,
     pub mode: MappingMode,
@@ -165,6 +228,7 @@ impl Mapping {
             edge_private_ip,
             oci_private_ip_ocid: None,
             target_ip,
+            public_port: None,
             target_port: None,
             protocol: Protocol::default(),
             mode: MappingMode::default(),
@@ -217,5 +281,9 @@ mod tests {
         let json = serde_json::to_string(&MappingMode::OneToOneSnat).unwrap();
 
         assert_eq!(json, "\"one_to_one_snat\"");
+
+        let json = serde_json::to_string(&MappingMode::PortForwardSnat).unwrap();
+
+        assert_eq!(json, "\"port_forward_snat\"");
     }
 }

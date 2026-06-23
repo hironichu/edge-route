@@ -3,10 +3,10 @@ use std::path::Path;
 use std::str::FromStr;
 
 use edge_core::state::SQLITE_SCHEMA;
-use edge_core::validation::{validate_edge_config, validate_mapping};
+use edge_core::validation::{conflicts, validate_edge_config, validate_mapping};
 use edge_core::{
     EdgeConfig, EdgeCoreError, Event, EventLevel, Generation, GenerationStatus, Mapping, MappingId,
-    MappingStatus,
+    MappingMode, MappingStatus,
 };
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
 use sqlx::{Row, SqlitePool};
@@ -48,10 +48,61 @@ impl SqliteStore {
             .execute(&self.pool)
             .await
             .map_err(sql_error)?;
+        self.ensure_port_forward_schema().await?;
+        self.ensure_column("mappings", "public_port", "INTEGER")
+            .await?;
         self.ensure_column("mappings", "health_status", "TEXT")
             .await?;
         self.ensure_column("mappings", "last_checked_at", "TEXT")
             .await?;
+        Ok(())
+    }
+
+    async fn ensure_port_forward_schema(&self) -> edge_core::Result<()> {
+        let row =
+            sqlx::query("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'mappings'")
+                .fetch_optional(&self.pool)
+                .await
+                .map_err(sql_error)?;
+        let Some(row) = row else {
+            return Ok(());
+        };
+        let sql: String = row.get("sql");
+        if !sql.contains("public_ip TEXT UNIQUE")
+            && !sql.contains("edge_private_ip TEXT NOT NULL UNIQUE")
+        {
+            return Ok(());
+        }
+
+        let mut tx = self.pool.begin().await.map_err(sql_error)?;
+        sqlx::query("ALTER TABLE mappings RENAME TO mappings_old_unique")
+            .execute(&mut *tx)
+            .await
+            .map_err(sql_error)?;
+        sqlx::query(SQLITE_SCHEMA)
+            .execute(&mut *tx)
+            .await
+            .map_err(sql_error)?;
+        sqlx::query(
+            "INSERT INTO mappings (
+                id, name, public_ip, oci_public_ip_ocid, edge_private_ip,
+                oci_private_ip_ocid, target_ip, public_port, target_port, protocol, mode,
+                enabled, status, last_error, health_status, last_checked_at, created_at, updated_at
+             )
+             SELECT
+                id, name, public_ip, oci_public_ip_ocid, edge_private_ip,
+                oci_private_ip_ocid, target_ip, NULL, target_port, protocol, mode,
+                enabled, status, last_error, health_status, last_checked_at, created_at, updated_at
+             FROM mappings_old_unique",
+        )
+        .execute(&mut *tx)
+        .await
+        .map_err(sql_error)?;
+        sqlx::query("DROP TABLE mappings_old_unique")
+            .execute(&mut *tx)
+            .await
+            .map_err(sql_error)?;
+        tx.commit().await.map_err(sql_error)?;
         Ok(())
     }
 
@@ -125,9 +176,9 @@ impl SqliteStore {
         sqlx::query(
             "INSERT INTO mappings (
                 id, name, public_ip, oci_public_ip_ocid, edge_private_ip,
-                oci_private_ip_ocid, target_ip, target_port, protocol, mode,
+                oci_private_ip_ocid, target_ip, public_port, target_port, protocol, mode,
                 enabled, status, last_error, health_status, last_checked_at, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         )
         .bind(mapping.id.as_str())
         .bind(&mapping.name)
@@ -136,6 +187,7 @@ impl SqliteStore {
         .bind(mapping.edge_private_ip.to_string())
         .bind(&mapping.oci_private_ip_ocid)
         .bind(mapping.target_ip.to_string())
+        .bind(mapping.public_port.map(i64::from))
         .bind(mapping.target_port.map(i64::from))
         .bind(enum_string(&mapping.protocol)?)
         .bind(enum_string(&mapping.mode)?)
@@ -193,7 +245,7 @@ impl SqliteStore {
         let result = sqlx::query(
             "UPDATE mappings SET
                 name = ?, public_ip = ?, oci_public_ip_ocid = ?, edge_private_ip = ?,
-                oci_private_ip_ocid = ?, target_ip = ?, target_port = ?, protocol = ?,
+                oci_private_ip_ocid = ?, target_ip = ?, public_port = ?, target_port = ?, protocol = ?,
                 mode = ?, enabled = ?, status = ?, last_error = ?, health_status = ?,
                 last_checked_at = ?, updated_at = ?
              WHERE id = ?",
@@ -204,6 +256,7 @@ impl SqliteStore {
         .bind(mapping.edge_private_ip.to_string())
         .bind(&mapping.oci_private_ip_ocid)
         .bind(mapping.target_ip.to_string())
+        .bind(mapping.public_port.map(i64::from))
         .bind(mapping.target_port.map(i64::from))
         .bind(enum_string(&mapping.protocol)?)
         .bind(enum_string(&mapping.mode)?)
@@ -365,37 +418,32 @@ impl SqliteStore {
     }
 
     async fn reject_duplicates(&self, mapping: &Mapping) -> edge_core::Result<()> {
-        let rows = sqlx::query(
-            "SELECT id, public_ip, edge_private_ip, target_ip FROM mappings WHERE id <> ?",
-        )
-        .bind(mapping.id.as_str())
-        .fetch_all(&self.pool)
-        .await
-        .map_err(sql_error)?;
+        let rows = sqlx::query("SELECT * FROM mappings WHERE id <> ?")
+            .bind(mapping.id.as_str())
+            .fetch_all(&self.pool)
+            .await
+            .map_err(sql_error)?;
 
         for row in rows {
-            let existing_id: String = row.get("id");
+            let existing = row_to_mapping(row)?;
             if let Some(public_ip) = mapping.public_ip {
-                let existing_public_ip: Option<String> = row.get("public_ip");
-                if existing_public_ip.as_deref() == Some(&public_ip.to_string()) {
+                if existing.public_ip == Some(public_ip)
+                    && (existing.mode == MappingMode::OneToOneSnat
+                        || mapping.mode == MappingMode::OneToOneSnat)
+                {
                     return Err(EdgeCoreError::DuplicatePublicIp(public_ip));
                 }
             }
 
-            let edge_private_ip: String = row.get("edge_private_ip");
-            if edge_private_ip == mapping.edge_private_ip.to_string() {
+            if existing.mode == MappingMode::OneToOneSnat
+                && mapping.mode == MappingMode::OneToOneSnat
+                && existing.target_ip == mapping.target_ip
+            {
+                return Err(EdgeCoreError::DuplicateTargetIp(mapping.target_ip));
+            } else if conflicts(&existing, mapping) {
                 return Err(EdgeCoreError::DuplicateEdgePrivateIp(
                     mapping.edge_private_ip,
                 ));
-            }
-
-            let target_ip: String = row.get("target_ip");
-            if target_ip == mapping.target_ip.to_string() {
-                return Err(EdgeCoreError::DuplicateTargetIp(mapping.target_ip));
-            }
-
-            if existing_id == mapping.id.as_str() {
-                return Err(EdgeCoreError::DuplicateMappingId(mapping.id.clone()));
             }
         }
         Ok(())
@@ -405,16 +453,9 @@ impl SqliteStore {
 fn row_to_mapping(row: sqlx::sqlite::SqliteRow) -> edge_core::Result<Mapping> {
     let id: String = row.get("id");
     let public_ip: Option<String> = row.get("public_ip");
+    let public_port = decode_port(row.get("public_port"), "public_port")?;
     let target_port: Option<i64> = row.get("target_port");
-    let target_port = match target_port {
-        Some(port) if (1..=u16::MAX as i64).contains(&port) => Some(port as u16),
-        Some(port) => {
-            return Err(EdgeCoreError::store(format!(
-                "invalid target_port in database: {port}"
-            )))
-        }
-        None => None,
-    };
+    let target_port = decode_port(target_port, "target_port")?;
 
     Ok(Mapping {
         id: MappingId::from_str(&id)?,
@@ -424,6 +465,7 @@ fn row_to_mapping(row: sqlx::sqlite::SqliteRow) -> edge_core::Result<Mapping> {
         edge_private_ip: parse_ip(row.get::<String, _>("edge_private_ip"))?,
         oci_private_ip_ocid: row.get("oci_private_ip_ocid"),
         target_ip: parse_ip(row.get::<String, _>("target_ip"))?,
+        public_port,
         target_port,
         protocol: enum_from_string(row.get::<String, _>("protocol"))?,
         mode: enum_from_string(row.get::<String, _>("mode"))?,
@@ -435,6 +477,16 @@ fn row_to_mapping(row: sqlx::sqlite::SqliteRow) -> edge_core::Result<Mapping> {
         created_at: parse_time(row.get::<String, _>("created_at"))?,
         updated_at: parse_time(row.get::<String, _>("updated_at"))?,
     })
+}
+
+fn decode_port(value: Option<i64>, column: &str) -> edge_core::Result<Option<u16>> {
+    match value {
+        Some(port) if (1..=u16::MAX as i64).contains(&port) => Ok(Some(port as u16)),
+        Some(port) => Err(EdgeCoreError::store(format!(
+            "invalid {column} in database: {port}"
+        ))),
+        None => Ok(None),
+    }
 }
 
 fn row_to_generation(row: sqlx::sqlite::SqliteRow) -> edge_core::Result<Generation> {
@@ -507,6 +559,7 @@ fn sql_error(error: sqlx::Error) -> EdgeCoreError {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use edge_core::{MappingMode, Protocol};
 
     fn config() -> EdgeConfig {
         EdgeConfig::new(
@@ -564,6 +617,96 @@ mod tests {
         assert_eq!(
             err,
             EdgeCoreError::DuplicateTargetIp("192.168.20.42".parse().unwrap())
+        );
+    }
+
+    #[tokio::test]
+    async fn stores_multiple_port_forwards_on_shared_edge_ip() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = SqliteStore::connect(dir.path().join("state.sqlite"))
+            .await
+            .unwrap();
+        store.set_edge_config(&config()).await.unwrap();
+
+        let mut tcp = mapping();
+        tcp.mode = MappingMode::PortForwardSnat;
+        tcp.protocol = Protocol::Tcp;
+        tcp.public_ip = Some("8.8.8.8".parse().unwrap());
+        tcp.public_port = Some(13306);
+        tcp.target_port = Some(3306);
+
+        let mut udp = mapping();
+        udp.id = MappingId::new();
+        udp.mode = MappingMode::PortForwardSnat;
+        udp.protocol = Protocol::Udp;
+        udp.public_ip = Some("8.8.8.8".parse().unwrap());
+        udp.public_port = Some(14444);
+        udp.target_ip = "192.168.20.43".parse().unwrap();
+        udp.target_port = Some(4444);
+
+        store.insert_mapping(&tcp).await.unwrap();
+        store.insert_mapping(&udp).await.unwrap();
+
+        let stored = store.list_mappings().await.unwrap();
+        assert_eq!(stored.len(), 2);
+        assert!(stored
+            .iter()
+            .any(|mapping| mapping.public_port == Some(13306)));
+        assert!(stored
+            .iter()
+            .any(|mapping| mapping.public_port == Some(14444)));
+    }
+
+    #[tokio::test]
+    async fn migrates_old_unique_mapping_schema() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("state.sqlite");
+        let options = SqliteConnectOptions::new()
+            .filename(&path)
+            .create_if_missing(true);
+        let pool = SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect_with(options)
+            .await
+            .unwrap();
+        sqlx::query(
+            "CREATE TABLE mappings (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                public_ip TEXT UNIQUE,
+                oci_public_ip_ocid TEXT,
+                edge_private_ip TEXT NOT NULL UNIQUE,
+                oci_private_ip_ocid TEXT,
+                target_ip TEXT NOT NULL,
+                target_port INTEGER,
+                protocol TEXT NOT NULL DEFAULT 'all',
+                mode TEXT NOT NULL DEFAULT 'one_to_one_snat',
+                enabled INTEGER NOT NULL DEFAULT 1,
+                status TEXT NOT NULL DEFAULT 'pending',
+                last_error TEXT,
+                health_status TEXT,
+                last_checked_at TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        drop(pool);
+
+        let store = SqliteStore::connect(&path).await.unwrap();
+        store.set_edge_config(&config()).await.unwrap();
+        let mut mapping = mapping();
+        mapping.mode = MappingMode::PortForwardSnat;
+        mapping.protocol = Protocol::Tcp;
+        mapping.public_port = Some(13306);
+        mapping.target_port = Some(3306);
+
+        store.insert_mapping(&mapping).await.unwrap();
+        assert_eq!(
+            store.get_mapping(&mapping.id).await.unwrap().public_port,
+            Some(13306)
         );
     }
 

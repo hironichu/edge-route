@@ -6,5 +6,7 @@ pub mod state;
 pub mod validation;
 
 pub use errors::{EdgeCoreError, Result};
-pub use mapping::{EdgeConfig, Mapping, MappingId, MappingMode, MappingStatus, Protocol};
+pub use mapping::{
+    EdgeConfig, Mapping, MappingId, MappingMode, MappingStatus, OciAuthMode, Protocol,
+};
 pub use state::{Event, EventLevel, Generation, GenerationStatus, InMemoryStateStore, StateStore};

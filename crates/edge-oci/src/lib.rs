@@ -1,7 +1,7 @@
 use std::net::Ipv4Addr;
 use std::path::PathBuf;
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tokio::process::Command;
 
@@ -15,6 +15,269 @@ pub enum OciError {
     Json(#[from] serde_json::Error),
     #[error("OCI CLI process failed: {0}")]
     Io(#[from] std::io::Error),
+    #[error("OCI API config failed: {0}")]
+    Config(String),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum OciAuthConfig {
+    InstancePrincipal {
+        region: String,
+    },
+    ApiKey {
+        region: String,
+        tenancy_id: String,
+        user_id: String,
+        fingerprint: String,
+        private_key_path: PathBuf,
+    },
+}
+
+impl OciAuthConfig {
+    pub fn region(&self) -> &str {
+        match self {
+            Self::InstancePrincipal { region } | Self::ApiKey { region, .. } => region,
+        }
+    }
+
+    pub fn api_key_from_env(region: impl Into<String>) -> Result<Self> {
+        let tenancy_id = required_env("OCI_TENANCY_ID")?;
+        let user_id = required_env("OCI_USER_ID")?;
+        let fingerprint = required_env("OCI_FINGERPRINT")?;
+        let private_key_path = PathBuf::from(required_env("OCI_PRIVATE_KEY_PATH")?);
+        Ok(Self::ApiKey {
+            region: region.into(),
+            tenancy_id,
+            user_id,
+            fingerprint,
+            private_key_path,
+        })
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OciApiClient {
+    auth: OciAuthConfig,
+}
+
+impl OciApiClient {
+    pub fn new(auth: OciAuthConfig) -> Self {
+        Self { auth }
+    }
+
+    pub fn auth(&self) -> &OciAuthConfig {
+        &self.auth
+    }
+
+    pub fn list_public_ips(&self, compartment_id: &str) -> OciApiRequest {
+        OciApiRequest::get(
+            self.endpoint("iaas"),
+            format!("/20160918/publicIps?compartmentId={compartment_id}&scope=REGION"),
+        )
+    }
+
+    pub fn assign_reserved_public_ip(
+        &self,
+        public_ip_id: &str,
+        private_ip_id: &str,
+    ) -> Result<OciApiRequest> {
+        OciApiRequest::put(
+            self.endpoint("iaas"),
+            format!("/20160918/publicIps/{public_ip_id}"),
+            &UpdatePublicIpDetails {
+                private_ip_id: Some(private_ip_id.to_owned()),
+            },
+        )
+    }
+
+    pub fn unassign_reserved_public_ip(&self, public_ip_id: &str) -> Result<OciApiRequest> {
+        OciApiRequest::put(
+            self.endpoint("iaas"),
+            format!("/20160918/publicIps/{public_ip_id}"),
+            &UpdatePublicIpDetails {
+                private_ip_id: None,
+            },
+        )
+    }
+
+    pub fn create_private_ip(
+        &self,
+        vnic_id: &str,
+        display_name: Option<&str>,
+    ) -> Result<OciApiRequest> {
+        OciApiRequest::post(
+            self.endpoint("iaas"),
+            "/20160918/privateIps".to_owned(),
+            &CreatePrivateIpDetails {
+                vnic_id: vnic_id.to_owned(),
+                display_name: display_name.map(str::to_owned),
+            },
+        )
+    }
+
+    pub fn create_reserved_public_ip(
+        &self,
+        compartment_id: &str,
+        private_ip_id: &str,
+        display_name: Option<&str>,
+    ) -> Result<OciApiRequest> {
+        OciApiRequest::post(
+            self.endpoint("iaas"),
+            "/20160918/publicIps".to_owned(),
+            &CreatePublicIpDetails {
+                compartment_id: compartment_id.to_owned(),
+                lifetime: "RESERVED".to_owned(),
+                private_ip_id: Some(private_ip_id.to_owned()),
+                display_name: display_name.map(str::to_owned),
+            },
+        )
+    }
+
+    pub fn add_nsg_security_rules(
+        &self,
+        nsg_id: &str,
+        rules: &[IngressSecurityRule],
+    ) -> Result<OciApiRequest> {
+        OciApiRequest::post(
+            self.endpoint("iaas"),
+            format!("/20160918/networkSecurityGroups/{nsg_id}/actions/addSecurityRules"),
+            &AddSecurityRulesDetails {
+                security_rules: rules.to_vec(),
+            },
+        )
+    }
+
+    pub fn remove_nsg_security_rules(
+        &self,
+        nsg_id: &str,
+        rule_ids: &[String],
+    ) -> Result<OciApiRequest> {
+        OciApiRequest::post(
+            self.endpoint("iaas"),
+            format!("/20160918/networkSecurityGroups/{nsg_id}/actions/removeSecurityRules"),
+            &RemoveSecurityRulesDetails {
+                security_rule_ids: rule_ids.to_vec(),
+            },
+        )
+    }
+
+    fn endpoint(&self, service: &str) -> String {
+        format!("https://{service}.{}.oraclecloud.com", self.auth.region())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum OciHttpMethod {
+    Get,
+    Post,
+    Put,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OciApiRequest {
+    pub method: OciHttpMethod,
+    pub endpoint: String,
+    pub path_and_query: String,
+    pub body: Option<String>,
+}
+
+impl OciApiRequest {
+    fn get(endpoint: String, path_and_query: String) -> Self {
+        Self {
+            method: OciHttpMethod::Get,
+            endpoint,
+            path_and_query,
+            body: None,
+        }
+    }
+
+    fn post<T: Serialize>(endpoint: String, path_and_query: String, body: &T) -> Result<Self> {
+        Self::with_body(OciHttpMethod::Post, endpoint, path_and_query, body)
+    }
+
+    fn put<T: Serialize>(endpoint: String, path_and_query: String, body: &T) -> Result<Self> {
+        Self::with_body(OciHttpMethod::Put, endpoint, path_and_query, body)
+    }
+
+    fn with_body<T: Serialize>(
+        method: OciHttpMethod,
+        endpoint: String,
+        path_and_query: String,
+        body: &T,
+    ) -> Result<Self> {
+        Ok(Self {
+            method,
+            endpoint,
+            path_and_query,
+            body: Some(serde_json::to_string(body)?),
+        })
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct CreatePrivateIpDetails {
+    vnic_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    display_name: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct CreatePublicIpDetails {
+    compartment_id: String,
+    lifetime: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    private_ip_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    display_name: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct UpdatePublicIpDetails {
+    private_ip_id: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct AddSecurityRulesDetails {
+    security_rules: Vec<IngressSecurityRule>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct RemoveSecurityRulesDetails {
+    security_rule_ids: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IngressSecurityRule {
+    pub protocol: String,
+    pub source: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tcp_options: Option<PortOptions>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub udp_options: Option<PortOptions>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PortOptions {
+    pub destination_port_range: PortRange,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PortRange {
+    pub min: u16,
+    pub max: u16,
+}
+
+fn required_env(name: &str) -> Result<String> {
+    std::env::var(name).map_err(|_| OciError::Config(format!("missing {name}")))
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -184,6 +447,8 @@ pub struct PublicIp {
     pub ip_address: Ipv4Addr,
     #[serde(rename = "private-ip-id")]
     pub private_ip_id: Option<String>,
+    pub lifetime: Option<String>,
+    pub scope: Option<String>,
     #[serde(rename = "lifecycle-state")]
     pub lifecycle_state: Option<String>,
     #[serde(rename = "display-name")]
@@ -245,13 +510,14 @@ mod tests {
 
     #[test]
     fn parses_public_ip_list() {
-        let json = r#"{"data":[{"id":"ocid1.publicip.x","ip-address":"152.1.2.3","private-ip-id":"ocid1.privateip.y","lifecycle-state":"AVAILABLE","display-name":"prod"}]}"#;
+        let json = r#"{"data":[{"id":"ocid1.publicip.x","ip-address":"152.1.2.3","private-ip-id":"ocid1.privateip.y","lifetime":"RESERVED","scope":"REGION","lifecycle-state":"AVAILABLE","display-name":"prod"}]}"#;
 
         let ips: Vec<PublicIp> = parse_list(json).unwrap();
 
         assert_eq!(ips[0].id, "ocid1.publicip.x");
         assert_eq!(ips[0].ip_address, "152.1.2.3".parse::<Ipv4Addr>().unwrap());
         assert_eq!(ips[0].private_ip_id.as_deref(), Some("ocid1.privateip.y"));
+        assert_eq!(ips[0].lifetime.as_deref(), Some("RESERVED"));
     }
 
     #[test]
@@ -279,5 +545,61 @@ mod tests {
             ..vnic
         };
         assert!(validate_vnic_forwarding(&blocked).is_err());
+    }
+
+    #[test]
+    fn builds_reserved_public_ip_reuse_request() {
+        let client = OciApiClient::new(OciAuthConfig::InstancePrincipal {
+            region: "eu-paris-1".to_owned(),
+        });
+
+        let request = client
+            .assign_reserved_public_ip("ocid1.publicip.x", "ocid1.privateip.y")
+            .unwrap();
+
+        assert_eq!(request.method, OciHttpMethod::Put);
+        assert_eq!(request.endpoint, "https://iaas.eu-paris-1.oraclecloud.com");
+        assert_eq!(
+            request.path_and_query,
+            "/20160918/publicIps/ocid1.publicip.x"
+        );
+        assert_eq!(
+            request.body.as_deref(),
+            Some(r#"{"privateIpId":"ocid1.privateip.y"}"#)
+        );
+    }
+
+    #[test]
+    fn builds_nsg_ingress_rule_request() {
+        let client = OciApiClient::new(OciAuthConfig::InstancePrincipal {
+            region: "eu-paris-1".to_owned(),
+        });
+        let rule = IngressSecurityRule {
+            protocol: "6".to_owned(),
+            source: "0.0.0.0/0".to_owned(),
+            tcp_options: Some(PortOptions {
+                destination_port_range: PortRange {
+                    min: 13306,
+                    max: 13306,
+                },
+            }),
+            udp_options: None,
+            description: Some("EdgeRoute mysql".to_owned()),
+        };
+
+        let request = client
+            .add_nsg_security_rules("ocid1.nsg.x", &[rule])
+            .unwrap();
+
+        assert_eq!(request.method, OciHttpMethod::Post);
+        assert_eq!(
+            request.path_and_query,
+            "/20160918/networkSecurityGroups/ocid1.nsg.x/actions/addSecurityRules"
+        );
+        assert!(request
+            .body
+            .as_deref()
+            .unwrap()
+            .contains(r#""destinationPortRange":{"min":13306,"max":13306}"#));
     }
 }

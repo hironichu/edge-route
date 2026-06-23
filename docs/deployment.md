@@ -12,7 +12,7 @@ EdgeRoute should run on the Linux edge host that owns the OCI VNIC/private IPs a
 - NAT/netfilter modules available for the active kernel. If modules are used, `sudo modprobe nf_tables nf_nat` should succeed.
 - IPv4 forwarding enabled: `sudo sysctl -w net.ipv4.ip_forward=1`, then persist in `/etc/sysctl.d/99-edgeroute.conf`.
 - Rust toolchain for source builds, or prebuilt `edge` and `edge-agent` binaries.
-- OCI CLI configured when using `edge oracle ip ...`.
+- OCI direct API auth configured for provisioning, or OCI CLI configured for the current fallback commands.
 - Tailscale installed and logged in on the edge and on the subnet router side.
 
 Run preflight on Linux:
@@ -46,7 +46,7 @@ Tailscale can manage Linux firewall rules through iptables or nftables. Do not s
 
 ## OCI Policy Notes
 
-EdgeRoute's OCI commands call the OCI CLI to list/create/delete private IPs and reserved public IPs, then store returned OCIDs in SQLite. Start in a non-production compartment.
+EdgeRoute models OCI changes as explicit provisioning operations: create or reuse a reserved public IP, assign it to an OCI private IP on the forwarding VNIC, and optionally add narrow ingress rules to configured NSGs. Start in a non-production compartment.
 
 Minimum policy shape to validate with your tenancy:
 
@@ -54,9 +54,10 @@ Minimum policy shape to validate with your tenancy:
 Allow group EdgeRouteOperators to use vnics in compartment <compartment>
 Allow group EdgeRouteOperators to manage private-ips in compartment <compartment>
 Allow group EdgeRouteOperators to manage public-ips in compartment <compartment>
+Allow group EdgeRouteOperators to manage network-security-groups in compartment <compartment>
 ```
 
-If your tenancy policy model does not accept the granular resource types, use a broader temporary policy such as `manage virtual-network-family` in the test compartment, then reduce it after confirming the exact API calls. The public subnet, route table, internet gateway, and NSG/security-list ingress still control whether the assigned public IP is reachable.
+If your tenancy policy model does not accept the granular resource types, use a broader temporary policy such as `manage virtual-network-family` in the test compartment, then reduce it after confirming the exact API calls. Prefer NSGs for EdgeRoute-managed security rules; subnet security lists are deliberately left operator-managed unless you add that scope explicitly. The public subnet, route table, internet gateway, and NSG ingress still control whether the assigned public IP is reachable.
 
 ## Install
 
@@ -91,6 +92,34 @@ edge --db /var/lib/edge-router/state.sqlite --home-cidr 192.168.20.0/24 apply --
 sudo edge --db /var/lib/edge-router/state.sqlite --home-cidr 192.168.20.0/24 apply --check
 ```
 
+Port-forward mappings allow one reserved public IP and one OCI private IP to front multiple internal services by protocol and public port:
+
+```sh
+edge --db /var/lib/edge-router/state.sqlite \
+  --home-cidr 10.10.40.0/24 \
+  map create \
+  --mode port_forward_snat \
+  --protocol tcp \
+  --public-ip <existing_public_ip> \
+  --edge-private-ip <internal_private_oracle_ip> \
+  --public-port 13306 \
+  --target 10.10.40.60 \
+  --target-port 3306 \
+  --name mysql
+
+edge --db /var/lib/edge-router/state.sqlite \
+  --home-cidr 10.10.40.0/24 \
+  map create \
+  --mode port_forward_snat \
+  --protocol udp \
+  --public-ip <existing_public_ip> \
+  --edge-private-ip <internal_private_oracle_ip> \
+  --public-port 14444 \
+  --target 10.10.40.60 \
+  --target-port 4444 \
+  --name udp-service
+```
+
 Only apply after dry-run and check look correct:
 
 ```sh
@@ -105,5 +134,7 @@ edge oracle ip allocate <mapping_id> --compartment-id <compartment_ocid> --vnic-
 ```
 
 Re-run `edge apply --dry-run`, `edge apply --check`, then `edge apply` after allocation changes the mapping's edge/public IP fields.
+
+For reserved public IP reuse, the safe sequence is: list reusable `RESERVED` regional public IPs with no `private-ip-id`, create the new private IP on the forwarding VNIC, assign the existing public IP to that private IP, update SQLite, then dry-run and validate nftables before applying. If the SQLite update fails, unassign the reused public IP rather than deleting it.
 
 Sources: [Tailscale subnet routers](https://tailscale.com/docs/features/subnet-routers), [Tailscale firewall mode](https://tailscale.com/docs/features/firewall-mode), [OCI public IPs](https://docs.oracle.com/en-us/iaas/Content/Network/Tasks/managingpublicIPs.htm), [OCI private IPs](https://docs.oracle.com/en-us/iaas/Content/Network/Tasks/managingIPaddresses.htm), [nftables project](https://www.netfilter.org/projects/nftables/index.html).

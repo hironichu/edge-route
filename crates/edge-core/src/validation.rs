@@ -4,7 +4,7 @@ use std::net::Ipv4Addr;
 use ipnet::Ipv4Net;
 
 use crate::errors::{EdgeCoreError, Result};
-use crate::mapping::{EdgeConfig, Mapping};
+use crate::mapping::{EdgeConfig, Mapping, MappingMode, Protocol};
 
 pub fn validate_edge_config(config: &EdgeConfig) -> Result<()> {
     validate_interface_name("wan_interface", &config.wan_interface)?;
@@ -47,10 +47,36 @@ pub fn validate_mapping(mapping: &Mapping, config: &EdgeConfig) -> Result<()> {
         ));
     }
 
-    if mapping.target_port == Some(0) {
-        return Err(EdgeCoreError::validation(
-            "target port must be between 1 and 65535",
-        ));
+    match mapping.mode {
+        MappingMode::OneToOneSnat => {
+            if mapping.public_port.is_some() {
+                return Err(EdgeCoreError::validation(
+                    "one-to-one mappings cannot set public_port",
+                ));
+            }
+            if mapping.protocol != Protocol::All {
+                return Err(EdgeCoreError::validation(
+                    "one-to-one mappings must use protocol=all",
+                ));
+            }
+        }
+        MappingMode::PortForwardSnat => {
+            if mapping.public_port.is_none() {
+                return Err(EdgeCoreError::validation(
+                    "port-forward mappings require public_port",
+                ));
+            }
+            if mapping.target_port.is_none() {
+                return Err(EdgeCoreError::validation(
+                    "port-forward mappings require target_port",
+                ));
+            }
+            if mapping.protocol == Protocol::All {
+                return Err(EdgeCoreError::validation(
+                    "port-forward mappings must use protocol=tcp or protocol=udp",
+                ));
+            }
+        }
     }
 
     Ok(())
@@ -58,30 +84,71 @@ pub fn validate_mapping(mapping: &Mapping, config: &EdgeConfig) -> Result<()> {
 
 pub fn validate_mappings(mappings: &[Mapping], config: &EdgeConfig) -> Result<()> {
     let mut public_ips = HashSet::new();
-    let mut edge_private_ips = HashSet::new();
-    let mut target_ips = HashSet::new();
 
     for mapping in mappings {
         validate_mapping(mapping, config)?;
+    }
 
-        if let Some(public_ip) = mapping.public_ip {
+    for (index, mapping) in mappings.iter().enumerate() {
+        if mapping.public_ip.is_some() && mapping.mode == MappingMode::OneToOneSnat {
+            let public_ip = mapping.public_ip.unwrap();
             if !public_ips.insert(public_ip) {
                 return Err(EdgeCoreError::DuplicatePublicIp(public_ip));
             }
         }
 
-        if !edge_private_ips.insert(mapping.edge_private_ip) {
-            return Err(EdgeCoreError::DuplicateEdgePrivateIp(
-                mapping.edge_private_ip,
-            ));
-        }
+        for existing in mappings.iter().skip(index + 1) {
+            if conflicts(mapping, existing) {
+                return Err(conflict_error(mapping, existing));
+            }
 
-        if !target_ips.insert(mapping.target_ip) {
-            return Err(EdgeCoreError::DuplicateTargetIp(mapping.target_ip));
+            if mapping.public_ip.is_some()
+                && mapping.public_ip == existing.public_ip
+                && (mapping.mode == MappingMode::OneToOneSnat
+                    || existing.mode == MappingMode::OneToOneSnat)
+            {
+                return Err(EdgeCoreError::DuplicatePublicIp(mapping.public_ip.unwrap()));
+            }
         }
     }
 
     Ok(())
+}
+
+pub fn conflicts(left: &Mapping, right: &Mapping) -> bool {
+    if !left.enabled || !right.enabled {
+        return false;
+    }
+
+    match (left.mode, right.mode) {
+        (MappingMode::OneToOneSnat, MappingMode::OneToOneSnat) => {
+            left.edge_private_ip == right.edge_private_ip || left.target_ip == right.target_ip
+        }
+        (MappingMode::OneToOneSnat, MappingMode::PortForwardSnat)
+        | (MappingMode::PortForwardSnat, MappingMode::OneToOneSnat) => {
+            left.edge_private_ip == right.edge_private_ip
+        }
+        (MappingMode::PortForwardSnat, MappingMode::PortForwardSnat) => {
+            left.edge_private_ip == right.edge_private_ip
+                && left.protocol == right.protocol
+                && left.public_port == right.public_port
+        }
+    }
+}
+
+fn conflict_error(left: &Mapping, right: &Mapping) -> EdgeCoreError {
+    if left.mode == MappingMode::OneToOneSnat
+        && right.mode == MappingMode::OneToOneSnat
+        && left.target_ip == right.target_ip
+    {
+        return EdgeCoreError::DuplicateTargetIp(left.target_ip);
+    }
+
+    if left.edge_private_ip == right.edge_private_ip {
+        return EdgeCoreError::DuplicateEdgePrivateIp(left.edge_private_ip);
+    }
+
+    EdgeCoreError::validation("mapping conflicts with an existing enabled mapping")
 }
 
 fn validate_name(name: &str) -> Result<()> {
@@ -194,7 +261,7 @@ fn is_network_or_broadcast(ip: Ipv4Addr, cidr: Ipv4Net) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::mapping::Mapping;
+    use crate::mapping::{Mapping, MappingMode, Protocol};
 
     fn config() -> EdgeConfig {
         EdgeConfig::new(
@@ -243,6 +310,60 @@ mod tests {
         assert_eq!(
             err,
             EdgeCoreError::DuplicatePublicIp("8.8.8.8".parse().unwrap())
+        );
+    }
+
+    #[test]
+    fn accepts_port_forwards_on_shared_edge_private_ip() {
+        let mut first = mapping();
+        first.mode = MappingMode::PortForwardSnat;
+        first.protocol = Protocol::Tcp;
+        first.public_port = Some(13306);
+        first.target_port = Some(3306);
+
+        let mut second = mapping();
+        second.id = crate::MappingId::new();
+        second.public_ip = first.public_ip;
+        second.mode = MappingMode::PortForwardSnat;
+        second.protocol = Protocol::Udp;
+        second.public_port = Some(14444);
+        second.target_ip = "192.168.20.43".parse().unwrap();
+        second.target_port = Some(4444);
+
+        validate_mappings(&[first, second], &config()).unwrap();
+    }
+
+    #[test]
+    fn rejects_duplicate_port_forward_tuple() {
+        let mut first = mapping();
+        first.mode = MappingMode::PortForwardSnat;
+        first.protocol = Protocol::Tcp;
+        first.public_port = Some(13306);
+        first.target_port = Some(3306);
+
+        let mut second = first.clone();
+        second.id = crate::MappingId::new();
+        second.target_ip = "192.168.20.43".parse().unwrap();
+
+        let err = validate_mappings(&[first, second], &config()).unwrap_err();
+
+        assert_eq!(
+            err,
+            EdgeCoreError::DuplicateEdgePrivateIp("10.0.0.101".parse().unwrap())
+        );
+    }
+
+    #[test]
+    fn rejects_port_forward_without_ports() {
+        let mut mapping = mapping();
+        mapping.mode = MappingMode::PortForwardSnat;
+        mapping.protocol = Protocol::Tcp;
+
+        let err = validate_mapping(&mapping, &config()).unwrap_err();
+
+        assert_eq!(
+            err,
+            EdgeCoreError::validation("port-forward mappings require public_port")
         );
     }
 
