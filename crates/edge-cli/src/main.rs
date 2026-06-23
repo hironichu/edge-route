@@ -5,13 +5,15 @@ use std::str::FromStr;
 use anyhow::{Context, Result};
 use clap::{Args, Parser, Subcommand};
 use edge_core::{
-    EdgeConfig, Mapping, MappingId, MappingMode, MappingStatus, OciAuthMode, Protocol,
+    EdgeConfig, Mapping, MappingBackend, MappingId, MappingMode, MappingStatus, OciAuthMode,
+    Protocol,
 };
 use edge_nft::{render_nftables, NftRenderConfig};
 use edge_oci::OciCli;
 use edge_reconcile::{ReconcileOptions, Reconciler};
 use edge_store::SqliteStore;
 use edge_tailscale::TailscaleCli;
+use edge_xdp::XdpConfig;
 use ipnet::Ipv4Net;
 use serde::Deserialize;
 
@@ -94,6 +96,9 @@ struct CreateMappingArgs {
     #[arg(long, default_value = "all")]
     protocol: Protocol,
 
+    #[arg(long, default_value = "nft")]
+    backend: MappingBackend,
+
     #[arg(long)]
     name: Option<String>,
 
@@ -125,6 +130,15 @@ struct ApplyArgs {
 
     #[arg(long, default_value = "/run/edge-router/generated.nft")]
     output: PathBuf,
+
+    #[arg(long)]
+    enable_xdp: bool,
+
+    #[arg(long)]
+    xdp_interface: Option<String>,
+
+    #[arg(long, default_value = "/sys/fs/bpf/edgeroute")]
+    xdp_pin_path: PathBuf,
 }
 
 #[derive(Debug, Args)]
@@ -140,6 +154,15 @@ struct ReconcileArgs {
 
     #[arg(long, default_value = "/run/edge-router/generated.nft")]
     output: PathBuf,
+
+    #[arg(long)]
+    enable_xdp: bool,
+
+    #[arg(long)]
+    xdp_interface: Option<String>,
+
+    #[arg(long, default_value = "/sys/fs/bpf/edgeroute")]
+    xdp_pin_path: PathBuf,
 }
 
 #[derive(Debug, Args)]
@@ -243,6 +266,7 @@ async fn handle_map(command: MapCommand, store: &SqliteStore, config: &EdgeConfi
             mapping.target_port = args.target_port;
             mapping.mode = args.mode;
             mapping.protocol = args.protocol;
+            mapping.backend = args.backend;
             store.insert_mapping(&mapping).await?;
             println!("Created mapping: {}", mapping.id);
             if let Some(public_ip) = mapping.public_ip {
@@ -281,6 +305,7 @@ async fn handle_map(command: MapCommand, store: &SqliteStore, config: &EdgeConfi
                     dry_run: false,
                     apply_nft: true,
                     apply_linux: true,
+                    xdp: XdpConfig::disabled(""),
                 };
                 Reconciler::default()
                     .reconcile(store, config, &options)
@@ -315,22 +340,38 @@ async fn handle_apply(args: ApplyArgs, store: &SqliteStore, config: &EdgeConfig)
         anyhow::bail!("--dry-run and --check are mutually exclusive");
     }
 
-    if args.dry_run {
+    let has_xdp_mappings = mappings
+        .iter()
+        .any(|mapping| mapping.enabled && mapping.backend == MappingBackend::Xdp);
+
+    if args.dry_run && !args.enable_xdp && !has_xdp_mappings {
         print!("{rendered}");
         return Ok(());
     }
 
     let output = args.output.clone();
+    let dry_run = args.dry_run;
     let options = ReconcileOptions {
         nft_output: args.output,
-        dry_run: false,
+        dry_run,
         apply_nft: !args.check,
         apply_linux: !args.check,
+        xdp: xdp_config(
+            args.enable_xdp,
+            args.xdp_interface,
+            args.xdp_pin_path,
+            config,
+        ),
     };
-    Reconciler::default()
+    let report = Reconciler::default()
         .reconcile(store, config, &options)
         .await?;
-    if args.check {
+    if dry_run {
+        print!("{rendered}");
+        if report.xdp_plan_entries > 0 {
+            eprintln!("XDP plan entries: {}", report.xdp_plan_entries);
+        }
+    } else if args.check {
         println!("nft validation ok: {}", output.display());
     } else {
         println!("Applied nftables config: {}", output.display());
@@ -348,18 +389,44 @@ async fn handle_reconcile(
         dry_run: args.dry_run,
         apply_nft: !args.skip_nft,
         apply_linux: !args.skip_linux,
+        xdp: xdp_config(
+            args.enable_xdp,
+            args.xdp_interface,
+            args.xdp_pin_path,
+            config,
+        ),
     };
     let report = Reconciler::default()
         .reconcile(store, config, &options)
         .await?;
     if args.dry_run {
         print!("{}", report.nftables_config);
+        if report.xdp_plan_entries > 0 {
+            eprintln!("XDP plan entries: {}", report.xdp_plan_entries);
+        }
     } else {
         println!("Reconciled generation: {:?}", report.generation_id);
         println!("Added addresses: {}", report.added_addresses.join(","));
         println!("Removed addresses: {}", report.removed_addresses.join(","));
+        println!("XDP plan entries: {}", report.xdp_plan_entries);
     }
     Ok(())
+}
+
+fn xdp_config(
+    enabled: bool,
+    interface: Option<String>,
+    pin_path: PathBuf,
+    config: &EdgeConfig,
+) -> XdpConfig {
+    if enabled {
+        XdpConfig::enabled(
+            interface.unwrap_or_else(|| config.wan_interface.clone()),
+            pin_path,
+        )
+    } else {
+        XdpConfig::disabled(interface.unwrap_or_else(|| config.wan_interface.clone()))
+    }
 }
 
 async fn handle_rollback(args: RollbackArgs, store: &SqliteStore) -> Result<()> {

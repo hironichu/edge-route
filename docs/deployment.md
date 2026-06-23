@@ -2,7 +2,7 @@
 
 ## Scope
 
-EdgeRoute should run on the Linux edge host that owns the OCI VNIC/private IPs and has a Tailscale route to the home CIDRs. The generated nftables rules do DNAT from each edge private IP to a target IP, then SNAT traffic going out `tailscale0` toward the home CIDRs.
+EdgeRoute should run on the Linux edge host that owns the OCI VNIC/private IPs and has a Tailscale route to the home CIDRs. The default `nft` backend generates nftables rules that DNAT from each edge private IP to a target IP, then SNAT traffic going out `tailscale0` toward the home CIDRs.
 
 ## Requirements
 
@@ -14,6 +14,8 @@ EdgeRoute should run on the Linux edge host that owns the OCI VNIC/private IPs a
 - Rust toolchain for source builds, or prebuilt `edge` and `edge-agent` binaries.
 - OCI direct API auth configured for provisioning, or OCI CLI configured for the current fallback commands.
 - Tailscale installed and logged in on the edge and on the subnet router side.
+
+The experimental `xdp` backend currently requires no extra runtime dependency because it only builds dry-run plans. It does not attach eBPF programs or change live packet handling.
 
 Run preflight on Linux:
 
@@ -84,6 +86,7 @@ edge --db /var/lib/edge-router/state.sqlite \
   --tailscale-interface tailscale0 \
   --home-cidr 192.168.20.0/24 \
   map create \
+  --backend nft \
   --edge-private-ip 10.0.0.101 \
   --target 192.168.20.42 \
   --name prod-vm-1
@@ -98,6 +101,7 @@ Port-forward mappings allow one reserved public IP and one OCI private IP to fro
 edge --db /var/lib/edge-router/state.sqlite \
   --home-cidr 10.10.40.0/24 \
   map create \
+  --backend nft \
   --mode port_forward_snat \
   --protocol tcp \
   --public-ip <existing_public_ip> \
@@ -110,6 +114,7 @@ edge --db /var/lib/edge-router/state.sqlite \
 edge --db /var/lib/edge-router/state.sqlite \
   --home-cidr 10.10.40.0/24 \
   map create \
+  --backend nft \
   --mode port_forward_snat \
   --protocol udp \
   --public-ip <existing_public_ip> \
@@ -125,6 +130,41 @@ Only apply after dry-run and check look correct:
 ```sh
 sudo edge --db /var/lib/edge-router/state.sqlite --home-cidr 192.168.20.0/24 apply
 ```
+
+## Experimental XDP Planning
+
+Use `backend=xdp` only when you want to inspect the future XDP fast-path plan. XDP mappings must be port-forward mappings and are not applied to live networking yet:
+
+```sh
+edge --db /var/lib/edge-router/state.sqlite \
+  --home-cidr 10.10.40.0/24 \
+  map create \
+  --backend xdp \
+  --mode port_forward_snat \
+  --protocol tcp \
+  --public-ip <existing_public_ip> \
+  --edge-private-ip <internal_private_oracle_ip> \
+  --public-port 13306 \
+  --target 10.10.40.60 \
+  --target-port 3306 \
+  --name mysql-xdp
+```
+
+Inspect the XDP plan with dry-run:
+
+```sh
+edge --db /var/lib/edge-router/state.sqlite \
+  --home-cidr 10.10.40.0/24 \
+  reconcile \
+  --dry-run \
+  --enable-xdp \
+  --xdp-interface ens3 \
+  --xdp-pin-path /sys/fs/bpf/edgeroute
+```
+
+If XDP mappings exist and `--enable-xdp` is omitted, reconcile fails closed instead of silently ignoring them. If XDP mappings exist and dry-run is not set, reconcile fails with `xdp apply is not implemented`.
+
+See [Experimental XDP Backend](xdp.md) for the current plan format and remaining production work.
 
 Optional OCI allocation flow:
 

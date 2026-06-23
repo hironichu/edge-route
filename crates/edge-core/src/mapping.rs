@@ -105,6 +105,35 @@ impl FromStr for MappingMode {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+pub enum MappingBackend {
+    Nft,
+    Xdp,
+    Proxy,
+}
+
+impl Default for MappingBackend {
+    fn default() -> Self {
+        Self::Nft
+    }
+}
+
+impl FromStr for MappingBackend {
+    type Err = EdgeCoreError;
+
+    fn from_str(value: &str) -> Result<Self> {
+        match value.trim().to_ascii_lowercase().as_str() {
+            "nft" => Ok(Self::Nft),
+            "xdp" => Ok(Self::Xdp),
+            "proxy" => Ok(Self::Proxy),
+            other => Err(EdgeCoreError::validation(format!(
+                "unsupported mapping backend: {other}"
+            ))),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum MappingStatus {
     Pending,
     Active,
@@ -200,6 +229,8 @@ pub struct Mapping {
     pub target_port: Option<u16>,
     pub protocol: Protocol,
     pub mode: MappingMode,
+    #[serde(default)]
+    pub backend: MappingBackend,
     pub enabled: bool,
     pub status: MappingStatus,
     pub last_error: Option<String>,
@@ -232,6 +263,7 @@ impl Mapping {
             target_port: None,
             protocol: Protocol::default(),
             mode: MappingMode::default(),
+            backend: MappingBackend::default(),
             enabled: true,
             status: MappingStatus::default(),
             last_error: None,
@@ -285,5 +317,49 @@ mod tests {
         let json = serde_json::to_string(&MappingMode::PortForwardSnat).unwrap();
 
         assert_eq!(json, "\"port_forward_snat\"");
+
+        let json = serde_json::to_string(&MappingBackend::Nft).unwrap();
+
+        assert_eq!(json, "\"nft\"");
+    }
+
+    #[test]
+    fn mapping_defaults_to_nft_backend() {
+        let mapping = Mapping::new(
+            "prod_vm_1",
+            None,
+            "10.0.0.101".parse().unwrap(),
+            "192.168.20.42".parse().unwrap(),
+        );
+
+        assert_eq!(mapping.backend, MappingBackend::Nft);
+    }
+
+    #[test]
+    fn legacy_mapping_json_defaults_to_nft_backend() {
+        let json = r#"{
+            "id":"map_legacy",
+            "name":"prod_vm_1",
+            "public_ip":null,
+            "oci_public_ip_ocid":null,
+            "edge_private_ip":"10.0.0.101",
+            "oci_private_ip_ocid":null,
+            "target_ip":"192.168.20.42",
+            "public_port":null,
+            "target_port":null,
+            "protocol":"all",
+            "mode":"one_to_one_snat",
+            "enabled":true,
+            "status":"pending",
+            "last_error":null,
+            "health_status":null,
+            "last_checked_at":null,
+            "created_at":"2026-01-01T00:00:00Z",
+            "updated_at":"2026-01-01T00:00:00Z"
+        }"#;
+
+        let mapping: Mapping = serde_json::from_str(json).unwrap();
+
+        assert_eq!(mapping.backend, MappingBackend::Nft);
     }
 }

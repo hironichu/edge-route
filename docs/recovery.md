@@ -30,6 +30,36 @@ sudo edge --db /var/lib/edge-router/state.sqlite apply
 
 If check fails, do not apply. Keep the agent stopped and fix the mapping or kernel/nft issue first.
 
+## XDP Planning Failure
+
+The `xdp` backend is experimental and does not apply live traffic yet. If reconcile reports:
+
+```txt
+XDP mappings are present but XDP is disabled
+```
+
+run an explicit dry-run plan:
+
+```sh
+edge --db /var/lib/edge-router/state.sqlite reconcile --dry-run --enable-xdp
+```
+
+If reconcile reports:
+
+```txt
+xdp apply is not implemented
+```
+
+disable the XDP mapping or recreate it with `--backend nft` before returning to service:
+
+```sh
+edge --db /var/lib/edge-router/state.sqlite map disable <mapping_id>
+edge --db /var/lib/edge-router/state.sqlite apply --dry-run
+sudo edge --db /var/lib/edge-router/state.sqlite apply --check
+```
+
+No eBPF program is attached by the current XDP backend, so XDP recovery is database/config cleanup rather than kernel detach.
+
 ## Restore Database
 
 ```sh

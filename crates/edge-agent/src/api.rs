@@ -8,11 +8,14 @@ use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::{Json, Router};
-use edge_core::{EdgeConfig, EdgeCoreError, Mapping, MappingId, MappingMode, Protocol};
+use edge_core::{
+    EdgeConfig, EdgeCoreError, Mapping, MappingBackend, MappingId, MappingMode, Protocol,
+};
 use edge_nft::{render_nftables, NftRenderConfig};
 use edge_reconcile::{ReconcileOptions, Reconciler};
 use edge_store::SqliteStore;
 use edge_tailscale::TailscaleCli;
+use edge_xdp::XdpConfig;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone)]
@@ -78,6 +81,7 @@ async fn create_mapping(
     mapping.target_port = request.target_port;
     mapping.mode = request.mode.unwrap_or_default();
     mapping.protocol = request.protocol.unwrap_or_default();
+    mapping.backend = request.backend.unwrap_or_default();
     state.store.insert_mapping(&mapping).await?;
     Ok(Json(mapping))
 }
@@ -105,6 +109,7 @@ async fn delete_mapping(
         dry_run: false,
         apply_nft: true,
         apply_linux: true,
+        xdp: XdpConfig::disabled(""),
     };
     if let Err(error) = Reconciler::default()
         .reconcile(&state.store, &state.config, &options)
@@ -170,6 +175,12 @@ async fn reconcile(
         dry_run: request.dry_run,
         apply_nft: !request.skip_nft,
         apply_linux: !request.skip_linux,
+        xdp: xdp_config(
+            request.enable_xdp,
+            request.xdp_interface,
+            request.xdp_pin_path,
+            &state.config,
+        ),
     };
     let report = Reconciler::default()
         .reconcile(&state.store, &state.config, &options)
@@ -179,6 +190,7 @@ async fn reconcile(
         generation_id: report.generation_id,
         added_addresses: report.added_addresses,
         removed_addresses: report.removed_addresses,
+        xdp_plan_entries: report.xdp_plan_entries,
         nftables_config: if request.include_config {
             Some(report.nftables_config)
         } else {
@@ -238,6 +250,7 @@ struct CreateMappingRequest {
     target_port: Option<u16>,
     mode: Option<MappingMode>,
     protocol: Option<Protocol>,
+    backend: Option<MappingBackend>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -250,6 +263,10 @@ struct ReconcileRequest {
     skip_nft: bool,
     #[serde(default)]
     include_config: bool,
+    #[serde(default)]
+    enable_xdp: bool,
+    xdp_interface: Option<String>,
+    xdp_pin_path: Option<PathBuf>,
     output: Option<PathBuf>,
 }
 
@@ -258,7 +275,23 @@ struct ReconcileResponse {
     generation_id: Option<i64>,
     added_addresses: Vec<String>,
     removed_addresses: Vec<String>,
+    xdp_plan_entries: usize,
     nftables_config: Option<String>,
+}
+
+fn xdp_config(
+    enabled: bool,
+    interface: Option<String>,
+    pin_path: Option<PathBuf>,
+    config: &EdgeConfig,
+) -> XdpConfig {
+    let interface = interface.unwrap_or_else(|| config.wan_interface.clone());
+    let pin_path = pin_path.unwrap_or_else(|| PathBuf::from("/sys/fs/bpf/edgeroute"));
+    if enabled {
+        XdpConfig::enabled(interface, pin_path)
+    } else {
+        XdpConfig::disabled(interface)
+    }
 }
 
 struct ApiError {

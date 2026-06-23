@@ -17,6 +17,107 @@ pub struct SqliteStore {
     pool: SqlitePool,
 }
 
+const MAPPING_CONSTRAINTS: &[&str] = &[
+    "CREATE UNIQUE INDEX IF NOT EXISTS mappings_one_to_one_edge_private_ip_enabled_idx
+        ON mappings(edge_private_ip)
+        WHERE enabled = 1 AND mode = 'one_to_one_snat'",
+    "CREATE UNIQUE INDEX IF NOT EXISTS mappings_one_to_one_public_ip_enabled_idx
+        ON mappings(public_ip)
+        WHERE enabled = 1 AND mode = 'one_to_one_snat' AND public_ip IS NOT NULL",
+    "CREATE UNIQUE INDEX IF NOT EXISTS mappings_one_to_one_target_ip_enabled_idx
+        ON mappings(target_ip)
+        WHERE enabled = 1 AND mode = 'one_to_one_snat'",
+    "CREATE UNIQUE INDEX IF NOT EXISTS mappings_port_forward_tuple_enabled_idx
+        ON mappings(edge_private_ip, protocol, public_port)
+        WHERE enabled = 1 AND mode = 'port_forward_snat'",
+    "CREATE TRIGGER IF NOT EXISTS mappings_reject_conflict_insert
+        BEFORE INSERT ON mappings
+        WHEN NEW.enabled = 1
+        BEGIN
+            SELECT RAISE(ABORT, 'mapping conflict: one-to-one owns edge_private_ip')
+            WHERE NEW.mode = 'port_forward_snat'
+              AND EXISTS (
+                  SELECT 1 FROM mappings
+                  WHERE enabled = 1
+                    AND mode = 'one_to_one_snat'
+                    AND edge_private_ip = NEW.edge_private_ip
+              );
+
+            SELECT RAISE(ABORT, 'mapping conflict: edge_private_ip already has port forwards')
+            WHERE NEW.mode = 'one_to_one_snat'
+              AND EXISTS (
+                  SELECT 1 FROM mappings
+                  WHERE enabled = 1
+                    AND mode = 'port_forward_snat'
+                    AND edge_private_ip = NEW.edge_private_ip
+              );
+
+            SELECT RAISE(ABORT, 'mapping conflict: public_ip already used by one-to-one')
+            WHERE NEW.mode = 'port_forward_snat'
+              AND NEW.public_ip IS NOT NULL
+              AND EXISTS (
+                  SELECT 1 FROM mappings
+                  WHERE enabled = 1
+                    AND mode = 'one_to_one_snat'
+                    AND public_ip = NEW.public_ip
+              );
+
+            SELECT RAISE(ABORT, 'mapping conflict: public_ip already used')
+            WHERE NEW.mode = 'one_to_one_snat'
+              AND NEW.public_ip IS NOT NULL
+              AND EXISTS (
+                  SELECT 1 FROM mappings
+                  WHERE enabled = 1
+                    AND public_ip = NEW.public_ip
+              );
+        END",
+    "CREATE TRIGGER IF NOT EXISTS mappings_reject_conflict_update
+        BEFORE UPDATE OF enabled, mode, backend, public_ip, edge_private_ip, target_ip, protocol, public_port ON mappings
+        WHEN NEW.enabled = 1
+        BEGIN
+            SELECT RAISE(ABORT, 'mapping conflict: one-to-one owns edge_private_ip')
+            WHERE NEW.mode = 'port_forward_snat'
+              AND EXISTS (
+                  SELECT 1 FROM mappings
+                  WHERE id <> NEW.id
+                    AND enabled = 1
+                    AND mode = 'one_to_one_snat'
+                    AND edge_private_ip = NEW.edge_private_ip
+              );
+
+            SELECT RAISE(ABORT, 'mapping conflict: edge_private_ip already has port forwards')
+            WHERE NEW.mode = 'one_to_one_snat'
+              AND EXISTS (
+                  SELECT 1 FROM mappings
+                  WHERE id <> NEW.id
+                    AND enabled = 1
+                    AND mode = 'port_forward_snat'
+                    AND edge_private_ip = NEW.edge_private_ip
+              );
+
+            SELECT RAISE(ABORT, 'mapping conflict: public_ip already used by one-to-one')
+            WHERE NEW.mode = 'port_forward_snat'
+              AND NEW.public_ip IS NOT NULL
+              AND EXISTS (
+                  SELECT 1 FROM mappings
+                  WHERE id <> NEW.id
+                    AND enabled = 1
+                    AND mode = 'one_to_one_snat'
+                    AND public_ip = NEW.public_ip
+              );
+
+            SELECT RAISE(ABORT, 'mapping conflict: public_ip already used')
+            WHERE NEW.mode = 'one_to_one_snat'
+              AND NEW.public_ip IS NOT NULL
+              AND EXISTS (
+                  SELECT 1 FROM mappings
+                  WHERE id <> NEW.id
+                    AND enabled = 1
+                    AND public_ip = NEW.public_ip
+              );
+        END",
+];
+
 impl SqliteStore {
     pub async fn connect(path: impl AsRef<Path>) -> edge_core::Result<Self> {
         let path = path.as_ref();
@@ -51,24 +152,18 @@ impl SqliteStore {
         self.ensure_port_forward_schema().await?;
         self.ensure_column("mappings", "public_port", "INTEGER")
             .await?;
+        self.ensure_column("mappings", "backend", "TEXT NOT NULL DEFAULT 'nft'")
+            .await?;
         self.ensure_column("mappings", "health_status", "TEXT")
             .await?;
         self.ensure_column("mappings", "last_checked_at", "TEXT")
             .await?;
+        self.ensure_mapping_constraints().await?;
         Ok(())
     }
 
     async fn ensure_port_forward_schema(&self) -> edge_core::Result<()> {
-        let row =
-            sqlx::query("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'mappings'")
-                .fetch_optional(&self.pool)
-                .await
-                .map_err(sql_error)?;
-        let Some(row) = row else {
-            return Ok(());
-        };
-        let sql: String = row.get("sql");
-        if !sql.contains("UNIQUE") {
+        if !self.has_legacy_mapping_unique_constraints().await? {
             return Ok(());
         }
 
@@ -85,12 +180,12 @@ impl SqliteStore {
             "INSERT INTO mappings (
                 id, name, public_ip, oci_public_ip_ocid, edge_private_ip,
                 oci_private_ip_ocid, target_ip, public_port, target_port, protocol, mode,
-                enabled, status, last_error, health_status, last_checked_at, created_at, updated_at
+                backend, enabled, status, last_error, health_status, last_checked_at, created_at, updated_at
              )
              SELECT
                 id, name, public_ip, oci_public_ip_ocid, edge_private_ip,
                 oci_private_ip_ocid, target_ip, NULL, target_port, protocol, mode,
-                enabled, status, last_error, health_status, last_checked_at, created_at, updated_at
+                'nft', enabled, status, last_error, health_status, last_checked_at, created_at, updated_at
              FROM mappings_old_unique",
         )
         .execute(&mut *tx)
@@ -101,6 +196,59 @@ impl SqliteStore {
             .await
             .map_err(sql_error)?;
         tx.commit().await.map_err(sql_error)?;
+        Ok(())
+    }
+
+    async fn has_legacy_mapping_unique_constraints(&self) -> edge_core::Result<bool> {
+        let row =
+            sqlx::query("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'mappings'")
+                .fetch_optional(&self.pool)
+                .await
+                .map_err(sql_error)?;
+        let Some(row) = row else {
+            return Ok(false);
+        };
+        let sql: String = row.get("sql");
+        if sql.to_ascii_uppercase().contains("UNIQUE") {
+            return Ok(true);
+        }
+
+        for row in sqlx::query("PRAGMA index_list(mappings)")
+            .fetch_all(&self.pool)
+            .await
+            .map_err(sql_error)?
+        {
+            let unique: i64 = row.get("unique");
+            let origin: String = row.get("origin");
+            if unique == 0 || origin == "c" {
+                continue;
+            }
+
+            let index_name: String = row.get("name");
+            let columns: Vec<String> = sqlx::query(&format!("PRAGMA index_info({index_name})"))
+                .fetch_all(&self.pool)
+                .await
+                .map_err(sql_error)?
+                .into_iter()
+                .map(|row| row.get("name"))
+                .collect();
+
+            if matches!(columns.as_slice(), [column] if column == "public_ip" || column == "edge_private_ip")
+            {
+                return Ok(true);
+            }
+        }
+
+        Ok(false)
+    }
+
+    async fn ensure_mapping_constraints(&self) -> edge_core::Result<()> {
+        for statement in MAPPING_CONSTRAINTS {
+            sqlx::query(statement)
+                .execute(&self.pool)
+                .await
+                .map_err(sql_error)?;
+        }
         Ok(())
     }
 
@@ -174,9 +322,9 @@ impl SqliteStore {
         sqlx::query(
             "INSERT INTO mappings (
                 id, name, public_ip, oci_public_ip_ocid, edge_private_ip,
-                oci_private_ip_ocid, target_ip, public_port, target_port, protocol, mode,
+                oci_private_ip_ocid, target_ip, public_port, target_port, protocol, mode, backend,
                 enabled, status, last_error, health_status, last_checked_at, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         )
         .bind(mapping.id.as_str())
         .bind(&mapping.name)
@@ -189,6 +337,7 @@ impl SqliteStore {
         .bind(mapping.target_port.map(i64::from))
         .bind(enum_string(&mapping.protocol)?)
         .bind(enum_string(&mapping.mode)?)
+        .bind(enum_string(&mapping.backend)?)
         .bind(mapping.enabled)
         .bind(enum_string(&mapping.status)?)
         .bind(&mapping.last_error)
@@ -244,7 +393,7 @@ impl SqliteStore {
             "UPDATE mappings SET
                 name = ?, public_ip = ?, oci_public_ip_ocid = ?, edge_private_ip = ?,
                 oci_private_ip_ocid = ?, target_ip = ?, public_port = ?, target_port = ?, protocol = ?,
-                mode = ?, enabled = ?, status = ?, last_error = ?, health_status = ?,
+                mode = ?, backend = ?, enabled = ?, status = ?, last_error = ?, health_status = ?,
                 last_checked_at = ?, updated_at = ?
              WHERE id = ?",
         )
@@ -258,6 +407,7 @@ impl SqliteStore {
         .bind(mapping.target_port.map(i64::from))
         .bind(enum_string(&mapping.protocol)?)
         .bind(enum_string(&mapping.mode)?)
+        .bind(enum_string(&mapping.backend)?)
         .bind(mapping.enabled)
         .bind(enum_string(&mapping.status)?)
         .bind(&mapping.last_error)
@@ -467,6 +617,7 @@ fn row_to_mapping(row: sqlx::sqlite::SqliteRow) -> edge_core::Result<Mapping> {
         target_port,
         protocol: enum_from_string(row.get::<String, _>("protocol"))?,
         mode: enum_from_string(row.get::<String, _>("mode"))?,
+        backend: enum_from_string(row.get::<String, _>("backend"))?,
         enabled: row.get("enabled"),
         status: enum_from_string(row.get::<String, _>("status"))?,
         last_error: row.get("last_error"),
@@ -557,7 +708,7 @@ fn sql_error(error: sqlx::Error) -> EdgeCoreError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use edge_core::{MappingMode, Protocol};
+    use edge_core::{MappingBackend, MappingMode, Protocol};
 
     fn config() -> EdgeConfig {
         EdgeConfig::new(
@@ -574,6 +725,20 @@ mod tests {
             "10.0.0.101".parse().unwrap(),
             "192.168.20.42".parse().unwrap(),
         )
+    }
+
+    fn port_forward(name: &str, public_port: u16, target_ip: &str, target_port: u16) -> Mapping {
+        let mut mapping = Mapping::new(
+            name,
+            Some("8.8.8.8".parse().unwrap()),
+            "10.0.0.101".parse().unwrap(),
+            target_ip.parse().unwrap(),
+        );
+        mapping.mode = MappingMode::PortForwardSnat;
+        mapping.protocol = Protocol::Tcp;
+        mapping.public_port = Some(public_port);
+        mapping.target_port = Some(target_port);
+        mapping
     }
 
     #[tokio::test]
@@ -656,6 +821,76 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn database_rejects_duplicate_port_forward_tuple() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = SqliteStore::connect(dir.path().join("state.sqlite"))
+            .await
+            .unwrap();
+        store.set_edge_config(&config()).await.unwrap();
+        let first = port_forward("mysql", 13306, "192.168.20.42", 3306);
+        store.insert_mapping(&first).await.unwrap();
+
+        let mut duplicate = port_forward("mysql_duplicate", 13306, "192.168.20.43", 3307);
+        duplicate.id = MappingId::new();
+        let err = insert_mapping_without_duplicate_check(&store, &duplicate)
+            .await
+            .unwrap_err();
+
+        assert!(err
+            .to_string()
+            .contains("UNIQUE constraint failed: mappings.edge_private_ip, mappings.protocol, mappings.public_port"));
+    }
+
+    #[tokio::test]
+    async fn database_rejects_cross_mode_edge_private_ip_conflict() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = SqliteStore::connect(dir.path().join("state.sqlite"))
+            .await
+            .unwrap();
+        store.set_edge_config(&config()).await.unwrap();
+        let first = port_forward("mysql", 13306, "192.168.20.42", 3306);
+        store.insert_mapping(&first).await.unwrap();
+
+        let mut one_to_one = mapping();
+        one_to_one.id = MappingId::new();
+        one_to_one.target_ip = "192.168.20.44".parse().unwrap();
+        let err = insert_mapping_without_duplicate_check(&store, &one_to_one)
+            .await
+            .unwrap_err();
+
+        assert!(err
+            .to_string()
+            .contains("mapping conflict: edge_private_ip already has port forwards"));
+    }
+
+    #[tokio::test]
+    async fn concurrent_conflicting_inserts_leave_one_mapping() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("state.sqlite");
+        let setup = SqliteStore::connect(&path).await.unwrap();
+        setup.set_edge_config(&config()).await.unwrap();
+        drop(setup);
+
+        let left_store = SqliteStore::connect(&path).await.unwrap();
+        let right_store = SqliteStore::connect(&path).await.unwrap();
+        let left = port_forward("mysql_a", 13306, "192.168.20.42", 3306);
+        let mut right = port_forward("mysql_b", 13306, "192.168.20.43", 3307);
+        right.id = MappingId::new();
+
+        let (left_result, right_result) = tokio::join!(
+            left_store.insert_mapping(&left),
+            right_store.insert_mapping(&right)
+        );
+        let successes = [left_result.is_ok(), right_result.is_ok()]
+            .into_iter()
+            .filter(|success| *success)
+            .count();
+
+        assert_eq!(successes, 1);
+        assert_eq!(left_store.list_mappings().await.unwrap().len(), 1);
+    }
+
+    #[tokio::test]
     async fn migrates_old_unique_mapping_schema() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("state.sqlite");
@@ -705,6 +940,60 @@ mod tests {
         assert_eq!(
             store.get_mapping(&mapping.id).await.unwrap().public_port,
             Some(13306)
+        );
+        assert_eq!(
+            store.get_mapping(&mapping.id).await.unwrap().backend,
+            MappingBackend::Nft
+        );
+    }
+
+    #[tokio::test]
+    async fn adds_backend_column_to_existing_port_forward_schema() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("state.sqlite");
+        let options = SqliteConnectOptions::new()
+            .filename(&path)
+            .create_if_missing(true);
+        let pool = SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect_with(options)
+            .await
+            .unwrap();
+        sqlx::query(
+            "CREATE TABLE mappings (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                public_ip TEXT,
+                oci_public_ip_ocid TEXT,
+                edge_private_ip TEXT NOT NULL,
+                oci_private_ip_ocid TEXT,
+                target_ip TEXT NOT NULL,
+                public_port INTEGER,
+                target_port INTEGER,
+                protocol TEXT NOT NULL DEFAULT 'all',
+                mode TEXT NOT NULL DEFAULT 'one_to_one_snat',
+                enabled INTEGER NOT NULL DEFAULT 1,
+                status TEXT NOT NULL DEFAULT 'pending',
+                last_error TEXT,
+                health_status TEXT,
+                last_checked_at TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        drop(pool);
+
+        let store = SqliteStore::connect(&path).await.unwrap();
+        store.set_edge_config(&config()).await.unwrap();
+        let mapping = mapping();
+        store.insert_mapping(&mapping).await.unwrap();
+
+        assert_eq!(
+            store.get_mapping(&mapping.id).await.unwrap().backend,
+            MappingBackend::Nft
         );
     }
 
@@ -760,5 +1049,41 @@ mod tests {
         );
         assert_eq!(event.id, 1);
         assert_eq!(store.list_events(10).await.unwrap().len(), 1);
+    }
+
+    async fn insert_mapping_without_duplicate_check(
+        store: &SqliteStore,
+        mapping: &Mapping,
+    ) -> edge_core::Result<()> {
+        sqlx::query(
+            "INSERT INTO mappings (
+                id, name, public_ip, oci_public_ip_ocid, edge_private_ip,
+                oci_private_ip_ocid, target_ip, public_port, target_port, protocol, mode, backend,
+                enabled, status, last_error, health_status, last_checked_at, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        )
+        .bind(mapping.id.as_str())
+        .bind(&mapping.name)
+        .bind(mapping.public_ip.map(|ip| ip.to_string()))
+        .bind(&mapping.oci_public_ip_ocid)
+        .bind(mapping.edge_private_ip.to_string())
+        .bind(&mapping.oci_private_ip_ocid)
+        .bind(mapping.target_ip.to_string())
+        .bind(mapping.public_port.map(i64::from))
+        .bind(mapping.target_port.map(i64::from))
+        .bind(enum_string(&mapping.protocol)?)
+        .bind(enum_string(&mapping.mode)?)
+        .bind(enum_string(&mapping.backend)?)
+        .bind(mapping.enabled)
+        .bind(enum_string(&mapping.status)?)
+        .bind(&mapping.last_error)
+        .bind(&mapping.health_status)
+        .bind(format_optional_time(mapping.last_checked_at)?)
+        .bind(format_time(mapping.created_at)?)
+        .bind(format_time(mapping.updated_at)?)
+        .execute(store.pool())
+        .await
+        .map_err(sql_error)?;
+        Ok(())
     }
 }

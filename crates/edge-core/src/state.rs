@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS mappings (
     target_port INTEGER,
     protocol TEXT NOT NULL DEFAULT 'all',
     mode TEXT NOT NULL DEFAULT 'one_to_one_snat',
+    backend TEXT NOT NULL DEFAULT 'nft',
     enabled INTEGER NOT NULL DEFAULT 1,
     status TEXT NOT NULL DEFAULT 'pending',
     last_error TEXT,

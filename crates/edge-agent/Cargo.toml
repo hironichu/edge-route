@@ -17,6 +17,7 @@ edge-nft = { path = "../edge-nft" }
 edge-reconcile = { path = "../edge-reconcile" }
 edge-store = { path = "../edge-store" }
 edge-tailscale = { path = "../edge-tailscale" }
+edge-xdp = { path = "../edge-xdp" }
 ipnet.workspace = true
 serde.workspace = true
 tokio.workspace = true

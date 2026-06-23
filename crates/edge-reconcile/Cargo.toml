@@ -9,6 +9,7 @@ edge-core = { path = "../edge-core" }
 edge-linux = { path = "../edge-linux" }
 edge-nft = { path = "../edge-nft" }
 edge-store = { path = "../edge-store" }
+edge-xdp = { path = "../edge-xdp" }
 thiserror.workspace = true
 time.workspace = true
 tokio.workspace = true

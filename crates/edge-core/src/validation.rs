@@ -4,7 +4,7 @@ use std::net::Ipv4Addr;
 use ipnet::Ipv4Net;
 
 use crate::errors::{EdgeCoreError, Result};
-use crate::mapping::{EdgeConfig, Mapping, MappingMode, Protocol};
+use crate::mapping::{EdgeConfig, Mapping, MappingBackend, MappingMode, Protocol};
 
 pub fn validate_edge_config(config: &EdgeConfig) -> Result<()> {
     validate_interface_name("wan_interface", &config.wan_interface)?;
@@ -47,6 +47,21 @@ pub fn validate_mapping(mapping: &Mapping, config: &EdgeConfig) -> Result<()> {
         ));
     }
 
+    match mapping.backend {
+        MappingBackend::Nft => {}
+        MappingBackend::Xdp if mapping.mode == MappingMode::PortForwardSnat => {}
+        MappingBackend::Xdp => {
+            return Err(EdgeCoreError::validation(
+                "xdp backend only supports port-forward mappings",
+            ))
+        }
+        MappingBackend::Proxy => {
+            return Err(EdgeCoreError::validation(
+                "proxy mapping backend is not implemented",
+            ))
+        }
+    }
+
     match mapping.mode {
         MappingMode::OneToOneSnat => {
             if mapping.public_port.is_some() {
@@ -84,18 +99,6 @@ pub fn validate_mapping(mapping: &Mapping, config: &EdgeConfig) -> Result<()> {
             if mapping.target_port == Some(0) {
                 return Err(EdgeCoreError::validation(
                     "target port must be between 1 and 65535",
-                ));
-            }
-            if mapping.protocol == Protocol::All {
-                return Err(EdgeCoreError::validation(
-                    "port-forward mappings must use protocol=tcp or protocol=udp",
-                ));
-            }
-        }
-            }
-            if mapping.target_port.is_none() {
-                return Err(EdgeCoreError::validation(
-                    "port-forward mappings require target_port",
                 ));
             }
             if mapping.protocol == Protocol::All {
@@ -288,7 +291,7 @@ fn is_network_or_broadcast(ip: Ipv4Addr, cidr: Ipv4Net) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::mapping::{Mapping, MappingMode, Protocol};
+    use crate::mapping::{Mapping, MappingBackend, MappingMode, Protocol};
 
     fn config() -> EdgeConfig {
         EdgeConfig::new(
@@ -391,6 +394,32 @@ mod tests {
         assert_eq!(
             err,
             EdgeCoreError::validation("port-forward mappings require public_port")
+        );
+    }
+
+    #[test]
+    fn rejects_proxy_backend_until_implemented() {
+        let mut mapping = mapping();
+        mapping.backend = MappingBackend::Proxy;
+
+        let err = validate_mapping(&mapping, &config()).unwrap_err();
+
+        assert_eq!(
+            err,
+            EdgeCoreError::validation("proxy mapping backend is not implemented")
+        );
+    }
+
+    #[test]
+    fn rejects_xdp_for_one_to_one_mappings() {
+        let mut mapping = mapping();
+        mapping.backend = MappingBackend::Xdp;
+
+        let err = validate_mapping(&mapping, &config()).unwrap_err();
+
+        assert_eq!(
+            err,
+            EdgeCoreError::validation("xdp backend only supports port-forward mappings")
         );
     }
 
