@@ -1,0 +1,3424 @@
+{
+  "version": "1.0.0",
+  "project": {
+    "name": "EdgeRoute",
+    "is_monorepo": true,
+    "total_files": 41,
+    "entry_points": [
+      "crates/edge-core/src/lib.rs",
+      "crates/edge-store/src/lib.rs",
+      "crates/edge-reconcile/src/lib.rs",
+      "crates/edge-xdp/src/lib.rs",
+      "crates/edge-tailscale/src/lib.rs",
+      "crates/edge-nft/src/lib.rs",
+      "crates/edge-oci/src/lib.rs",
+      "crates/edge-linux/src/lib.rs"
+    ],
+    "tech_stack": [
+      {
+        "name": "Rust",
+        "version": null,
+        "category": "language"
+      }
+    ],
+    "entry_candidates": [
+      "crates/edge-core/src/lib.rs",
+      "crates/edge-store/src/lib.rs",
+      "crates/edge-reconcile/src/lib.rs",
+      "crates/edge-xdp/src/lib.rs",
+      "crates/edge-tailscale/src/lib.rs",
+      "crates/edge-nft/src/lib.rs",
+      "crates/edge-oci/src/lib.rs",
+      "crates/edge-linux/src/lib.rs",
+      "crates/edge-agent/src/main.rs",
+      "crates/edge-cli/src/main.rs"
+    ],
+    "graph_mode": "flow"
+  },
+  "nodes": [
+    {
+      "id": "file:.github/workflows/ci.yml",
+      "type": "pipeline",
+      "filePath": ".github/workflows/ci.yml",
+      "language": "yaml",
+      "symbolCount": 0,
+      "lineCount": 119,
+      "complexity": "moderate",
+      "pagerank": 0.009915,
+      "communityId": 5,
+      "tags": [
+        "config",
+        "ci"
+      ],
+      "summary": "CI / pipeline definition: ci.yml."
+    },
+    {
+      "id": "file:.github/workflows/release.yml",
+      "type": "pipeline",
+      "filePath": ".github/workflows/release.yml",
+      "language": "yaml",
+      "symbolCount": 0,
+      "lineCount": 86,
+      "complexity": "simple",
+      "pagerank": 0.009915,
+      "communityId": 6,
+      "tags": [
+        "config",
+        "ci"
+      ],
+      "summary": "CI / pipeline definition: release.yml."
+    },
+    {
+      "id": "file:Cargo.toml",
+      "type": "config",
+      "filePath": "Cargo.toml",
+      "language": "toml",
+      "symbolCount": 0,
+      "lineCount": 29,
+      "complexity": "simple",
+      "pagerank": 0.009915,
+      "communityId": 7,
+      "tags": [
+        "config"
+      ],
+      "summary": "Configuration file: Cargo.toml."
+    },
+    {
+      "id": "file:README.md",
+      "type": "document",
+      "filePath": "README.md",
+      "language": "markdown",
+      "symbolCount": 0,
+      "lineCount": 40,
+      "complexity": "simple",
+      "pagerank": 0.009915,
+      "communityId": 8,
+      "tags": [],
+      "summary": "Documentation: README.md."
+    },
+    {
+      "id": "file:config/config.example.toml",
+      "type": "config",
+      "filePath": "config/config.example.toml",
+      "language": "toml",
+      "symbolCount": 0,
+      "lineCount": 25,
+      "complexity": "simple",
+      "pagerank": 0.009915,
+      "communityId": 9,
+      "tags": [
+        "config"
+      ],
+      "summary": "Configuration file: config.example.toml."
+    },
+    {
+      "id": "file:crates/edge-agent/Cargo.toml",
+      "type": "config",
+      "filePath": "crates/edge-agent/Cargo.toml",
+      "language": "toml",
+      "symbolCount": 0,
+      "lineCount": 16,
+      "complexity": "simple",
+      "pagerank": 0.009915,
+      "communityId": 10,
+      "tags": [
+        "config"
+      ],
+      "summary": "Configuration file: Cargo.toml."
+    },
+    {
+      "id": "file:crates/edge-agent/src/api.rs",
+      "type": "file",
+      "filePath": "crates/edge-agent/src/api.rs",
+      "language": "rust",
+      "symbolCount": 62,
+      "lineCount": 282,
+      "complexity": "complex",
+      "pagerank": 0.011199,
+      "communityId": 4,
+      "tags": [],
+      "summary": "Application module api defining AppState, router, status.",
+      "primaryOwner": "Nassim Zen"
+    },
+    {
+      "id": "file:crates/edge-agent/src/main.rs",
+      "type": "file",
+      "filePath": "crates/edge-agent/src/main.rs",
+      "language": "rust",
+      "symbolCount": 27,
+      "lineCount": 130,
+      "complexity": "complex",
+      "pagerank": 0.01067,
+      "communityId": 2,
+      "tags": [
+        "entry_point"
+      ],
+      "summary": "Application module main defining Cli, main, FileConfig.",
+      "primaryOwner": "Nassim Zen"
+    },
+    {
+      "id": "file:crates/edge-cli/Cargo.toml",
+      "type": "config",
+      "filePath": "crates/edge-cli/Cargo.toml",
+      "language": "toml",
+      "symbolCount": 0,
+      "lineCount": 15,
+      "complexity": "simple",
+      "pagerank": 0.009915,
+      "communityId": 11,
+      "tags": [
+        "config"
+      ],
+      "summary": "Configuration file: Cargo.toml."
+    },
+    {
+      "id": "file:crates/edge-cli/src/main.rs",
+      "type": "file",
+      "filePath": "crates/edge-cli/src/main.rs",
+      "language": "rust",
+      "symbolCount": 112,
+      "lineCount": 586,
+      "complexity": "complex",
+      "pagerank": 0.01051,
+      "communityId": 3,
+      "tags": [
+        "entry_point"
+      ],
+      "summary": "CLI module main defining Cli, Command, MapCommand.",
+      "primaryOwner": "Nassim Zen"
+    },
+    {
+      "id": "file:crates/edge-core/Cargo.toml",
+      "type": "config",
+      "filePath": "crates/edge-core/Cargo.toml",
+      "language": "toml",
+      "symbolCount": 0,
+      "lineCount": 6,
+      "complexity": "simple",
+      "pagerank": 0.009915,
+      "communityId": 12,
+      "tags": [
+        "config"
+      ],
+      "summary": "Configuration file: Cargo.toml."
+    },
+    {
+      "id": "file:crates/edge-core/src/errors.rs",
+      "type": "file",
+      "filePath": "crates/edge-core/src/errors.rs",
+      "language": "rust",
+      "symbolCount": 12,
+      "lineCount": 23,
+      "complexity": "moderate",
+      "pagerank": 0.023386,
+      "communityId": 0,
+      "tags": [],
+      "summary": "Application module errors defining EdgeCoreError, EdgeCoreError, validation.",
+      "primaryOwner": "Nassim Zen"
+    },
+    {
+      "id": "file:crates/edge-core/src/lib.rs",
+      "type": "file",
+      "filePath": "crates/edge-core/src/lib.rs",
+      "language": "rust",
+      "symbolCount": 4,
+      "lineCount": 10,
+      "complexity": "moderate",
+      "pagerank": 0.021318,
+      "communityId": 0,
+      "tags": [
+        "entry_point"
+      ],
+      "summary": "Application module lib (4 symbols).",
+      "primaryOwner": "Nassim Zen"
+    },
+    {
+      "id": "file:crates/edge-core/src/mapping.rs",
+      "type": "file",
+      "filePath": "crates/edge-core/src/mapping.rs",
+      "language": "rust",
+      "symbolCount": 87,
+      "lineCount": 228,
+      "complexity": "complex",
+      "pagerank": 0.030013,
+      "communityId": 0,
+      "tags": [],
+      "summary": "Application module mapping defining MappingId, MappingId, new.",
+      "primaryOwner": "Nassim Zen"
+    },
+    {
+      "id": "file:crates/edge-core/src/state.rs",
+      "type": "file",
+      "filePath": "crates/edge-core/src/state.rs",
+      "language": "rust",
+      "symbolCount": 65,
+      "lineCount": 296,
+      "complexity": "complex",
+      "pagerank": 0.018231,
+      "communityId": 0,
+      "tags": [],
+      "summary": "Application module state defining StateStore, GenerationStatus, Generation.",
+      "primaryOwner": "Nassim Zen"
+    },
+    {
+      "id": "file:crates/edge-core/src/validation.rs",
+      "type": "file",
+      "filePath": "crates/edge-core/src/validation.rs",
+      "language": "rust",
+      "symbolCount": 25,
+      "lineCount": 347,
+      "complexity": "complex",
+      "pagerank": 0.027481,
+      "communityId": 0,
+      "tags": [],
+      "summary": "Application module validation defining validate_edge_config, validate_mapping, validate_mappings.",
+      "primaryOwner": "Nassim Zen"
+    },
+    {
+      "id": "file:crates/edge-linux/Cargo.toml",
+      "type": "config",
+      "filePath": "crates/edge-linux/Cargo.toml",
+      "language": "toml",
+      "symbolCount": 0,
+      "lineCount": 4,
+      "complexity": "simple",
+      "pagerank": 0.009915,
+      "communityId": 13,
+      "tags": [
+        "config"
+      ],
+      "summary": "Configuration file: Cargo.toml."
+    },
+    {
+      "id": "file:crates/edge-linux/src/lib.rs",
+      "type": "file",
+      "filePath": "crates/edge-linux/src/lib.rs",
+      "language": "rust",
+      "symbolCount": 28,
+      "lineCount": 109,
+      "complexity": "complex",
+      "pagerank": 0.01204,
+      "communityId": 1,
+      "tags": [
+        "entry_point"
+      ],
+      "summary": "Application module lib defining LinuxError, Linux, Linux.",
+      "primaryOwner": "Nassim Zen"
+    },
+    {
+      "id": "file:crates/edge-nft/Cargo.toml",
+      "type": "config",
+      "filePath": "crates/edge-nft/Cargo.toml",
+      "language": "toml",
+      "symbolCount": 0,
+      "lineCount": 6,
+      "complexity": "simple",
+      "pagerank": 0.009915,
+      "communityId": 14,
+      "tags": [
+        "config"
+      ],
+      "summary": "Configuration file: Cargo.toml."
+    },
+    {
+      "id": "file:crates/edge-nft/src/apply.rs",
+      "type": "file",
+      "filePath": "crates/edge-nft/src/apply.rs",
+      "language": "rust",
+      "symbolCount": 24,
+      "lineCount": 67,
+      "complexity": "complex",
+      "pagerank": 0.017345,
+      "communityId": 1,
+      "tags": [],
+      "summary": "Application module apply defining NftError, Nft, Nft.",
+      "primaryOwner": "Nassim Zen"
+    },
+    {
+      "id": "file:crates/edge-nft/src/lib.rs",
+      "type": "file",
+      "filePath": "crates/edge-nft/src/lib.rs",
+      "language": "rust",
+      "symbolCount": 2,
+      "lineCount": 3,
+      "complexity": "simple",
+      "pagerank": 0.011702,
+      "communityId": 1,
+      "tags": [
+        "entry_point"
+      ],
+      "summary": "Application module lib (2 symbols).",
+      "primaryOwner": "Nassim Zen"
+    },
+    {
+      "id": "file:crates/edge-nft/src/render.rs",
+      "type": "file",
+      "filePath": "crates/edge-nft/src/render.rs",
+      "language": "rust",
+      "symbolCount": 10,
+      "lineCount": 173,
+      "complexity": "moderate",
+      "pagerank": 0.020774,
+      "communityId": 1,
+      "tags": [],
+      "summary": "Application module render defining NftRenderConfig, NftRenderConfig, default.",
+      "primaryOwner": "Nassim Zen"
+    },
+    {
+      "id": "file:crates/edge-oci/Cargo.toml",
+      "type": "config",
+      "filePath": "crates/edge-oci/Cargo.toml",
+      "language": "toml",
+      "symbolCount": 0,
+      "lineCount": 5,
+      "complexity": "simple",
+      "pagerank": 0.009915,
+      "communityId": 15,
+      "tags": [
+        "config"
+      ],
+      "summary": "Configuration file: Cargo.toml."
+    },
+    {
+      "id": "file:crates/edge-oci/src/lib.rs",
+      "type": "file",
+      "filePath": "crates/edge-oci/src/lib.rs",
+      "language": "rust",
+      "symbolCount": 123,
+      "lineCount": 435,
+      "complexity": "complex",
+      "pagerank": 0.012245,
+      "communityId": 3,
+      "tags": [
+        "entry_point"
+      ],
+      "summary": "Application module lib defining OciError, OciAuthConfig, OciAuthConfig.",
+      "primaryOwner": "Nassim Zen"
+    },
+    {
+      "id": "file:crates/edge-reconcile/Cargo.toml",
+      "type": "config",
+      "filePath": "crates/edge-reconcile/Cargo.toml",
+      "language": "toml",
+      "symbolCount": 0,
+      "lineCount": 11,
+      "complexity": "simple",
+      "pagerank": 0.009915,
+      "communityId": 16,
+      "tags": [
+        "config"
+      ],
+      "summary": "Configuration file: Cargo.toml."
+    },
+    {
+      "id": "file:crates/edge-reconcile/src/lib.rs",
+      "type": "file",
+      "filePath": "crates/edge-reconcile/src/lib.rs",
+      "language": "rust",
+      "symbolCount": 39,
+      "lineCount": 349,
+      "complexity": "complex",
+      "pagerank": 0.011702,
+      "communityId": 1,
+      "tags": [
+        "entry_point"
+      ],
+      "summary": "Application module lib defining ReconcileError, ReconcileOptions, ReconcileOptions.",
+      "primaryOwner": "Nassim Zen"
+    },
+    {
+      "id": "file:crates/edge-store/Cargo.toml",
+      "type": "config",
+      "filePath": "crates/edge-store/Cargo.toml",
+      "language": "toml",
+      "symbolCount": 0,
+      "lineCount": 7,
+      "complexity": "simple",
+      "pagerank": 0.009915,
+      "communityId": 17,
+      "tags": [
+        "config"
+      ],
+      "summary": "Configuration file: Cargo.toml."
+    },
+    {
+      "id": "file:crates/edge-store/migrations/0001_init.sql",
+      "type": "schema",
+      "filePath": "crates/edge-store/migrations/0001_init.sql",
+      "language": "sql",
+      "symbolCount": 0,
+      "lineCount": 27,
+      "complexity": "simple",
+      "pagerank": 0.009915,
+      "communityId": 18,
+      "tags": [
+        "data"
+      ],
+      "summary": "Data / schema definition: 0001_init.sql."
+    },
+    {
+      "id": "file:crates/edge-store/src/lib.rs",
+      "type": "file",
+      "filePath": "crates/edge-store/src/lib.rs",
+      "language": "rust",
+      "symbolCount": 55,
+      "lineCount": 992,
+      "complexity": "complex",
+      "pagerank": 0.013501,
+      "communityId": 0,
+      "tags": [
+        "entry_point"
+      ],
+      "summary": "Application module lib defining SqliteStore, SqliteStore, connect.",
+      "primaryOwner": "Nassim Zen"
+    },
+    {
+      "id": "file:crates/edge-tailscale/Cargo.toml",
+      "type": "config",
+      "filePath": "crates/edge-tailscale/Cargo.toml",
+      "language": "toml",
+      "symbolCount": 0,
+      "lineCount": 5,
+      "complexity": "simple",
+      "pagerank": 0.009915,
+      "communityId": 19,
+      "tags": [
+        "config"
+      ],
+      "summary": "Configuration file: Cargo.toml."
+    },
+    {
+      "id": "file:crates/edge-tailscale/src/lib.rs",
+      "type": "file",
+      "filePath": "crates/edge-tailscale/src/lib.rs",
+      "language": "rust",
+      "symbolCount": 45,
+      "lineCount": 138,
+      "complexity": "complex",
+      "pagerank": 0.012565,
+      "communityId": 3,
+      "tags": [
+        "entry_point"
+      ],
+      "summary": "Application module lib defining TailscaleError, TailscaleCli, TailscaleCli.",
+      "primaryOwner": "Nassim Zen"
+    },
+    {
+      "id": "file:crates/edge-xdp/Cargo.toml",
+      "type": "config",
+      "filePath": "crates/edge-xdp/Cargo.toml",
+      "language": "toml",
+      "symbolCount": 0,
+      "lineCount": 5,
+      "complexity": "simple",
+      "pagerank": 0.009915,
+      "communityId": 20,
+      "tags": [
+        "config"
+      ],
+      "summary": "Configuration file: Cargo.toml."
+    },
+    {
+      "id": "file:crates/edge-xdp/src/lib.rs",
+      "type": "file",
+      "filePath": "crates/edge-xdp/src/lib.rs",
+      "language": "rust",
+      "symbolCount": 55,
+      "lineCount": 216,
+      "complexity": "complex",
+      "pagerank": 0.013634,
+      "communityId": 3,
+      "tags": [
+        "entry_point"
+      ],
+      "summary": "Application module lib defining XdpError, XdpAttachMode, XdpConfig.",
+      "primaryOwner": "Nassim Zen"
+    },
+    {
+      "id": "file:docs/ci.md",
+      "type": "document",
+      "filePath": "docs/ci.md",
+      "language": "markdown",
+      "symbolCount": 0,
+      "lineCount": 94,
+      "complexity": "simple",
+      "pagerank": 0.009915,
+      "communityId": 21,
+      "tags": [],
+      "summary": "Documentation: ci.md."
+    },
+    {
+      "id": "file:docs/deployment.md",
+      "type": "document",
+      "filePath": "docs/deployment.md",
+      "language": "markdown",
+      "symbolCount": 0,
+      "lineCount": 214,
+      "complexity": "moderate",
+      "pagerank": 0.009915,
+      "communityId": 22,
+      "tags": [],
+      "summary": "Documentation: deployment.md."
+    },
+    {
+      "id": "file:docs/recovery.md",
+      "type": "document",
+      "filePath": "docs/recovery.md",
+      "language": "markdown",
+      "symbolCount": 0,
+      "lineCount": 101,
+      "complexity": "moderate",
+      "pagerank": 0.009915,
+      "communityId": 23,
+      "tags": [],
+      "summary": "Documentation: recovery.md."
+    },
+    {
+      "id": "file:docs/xdp.md",
+      "type": "document",
+      "filePath": "docs/xdp.md",
+      "language": "markdown",
+      "symbolCount": 0,
+      "lineCount": 76,
+      "complexity": "simple",
+      "pagerank": 0.009915,
+      "communityId": 24,
+      "tags": [],
+      "summary": "Documentation: xdp.md."
+    },
+    {
+      "id": "file:scripts/install.sh",
+      "type": "file",
+      "filePath": "scripts/install.sh",
+      "language": "shell",
+      "symbolCount": 0,
+      "lineCount": 212,
+      "complexity": "moderate",
+      "pagerank": 0.009915,
+      "communityId": 25,
+      "tags": [],
+      "summary": "Application module install."
+    },
+    {
+      "id": "file:scripts/linux-arm64-nft-check.sh",
+      "type": "file",
+      "filePath": "scripts/linux-arm64-nft-check.sh",
+      "language": "shell",
+      "symbolCount": 0,
+      "lineCount": 49,
+      "complexity": "simple",
+      "pagerank": 0.009915,
+      "communityId": 26,
+      "tags": [],
+      "summary": "Application module linux-arm64-nft-check.",
+      "primaryOwner": "Nassim Zen"
+    },
+    {
+      "id": "file:scripts/linux-arm64-test.sh",
+      "type": "file",
+      "filePath": "scripts/linux-arm64-test.sh",
+      "language": "shell",
+      "symbolCount": 0,
+      "lineCount": 24,
+      "complexity": "simple",
+      "pagerank": 0.009915,
+      "communityId": 27,
+      "tags": [],
+      "summary": "Application module linux-arm64-test.",
+      "primaryOwner": "Nassim Zen"
+    },
+    {
+      "id": "file:scripts/nft-min-check.sh",
+      "type": "file",
+      "filePath": "scripts/nft-min-check.sh",
+      "language": "shell",
+      "symbolCount": 0,
+      "lineCount": 33,
+      "complexity": "simple",
+      "pagerank": 0.009915,
+      "communityId": 28,
+      "tags": [],
+      "summary": "Application module nft-min-check.",
+      "primaryOwner": "Nassim Zen"
+    },
+    {
+      "id": "function:crates/edge-core/src/errors.rs:store",
+      "type": "function",
+      "filePath": "crates/edge-core/src/errors.rs",
+      "name": "store",
+      "language": "rust",
+      "tags": [],
+      "summary": ""
+    },
+    {
+      "id": "function:crates/edge-core/src/errors.rs:validation",
+      "type": "function",
+      "filePath": "crates/edge-core/src/errors.rs",
+      "name": "validation",
+      "language": "rust",
+      "tags": [],
+      "summary": ""
+    },
+    {
+      "id": "function:crates/edge-core/src/mapping.rs:as_str",
+      "type": "function",
+      "filePath": "crates/edge-core/src/mapping.rs",
+      "name": "as_str",
+      "language": "rust",
+      "tags": [],
+      "summary": ""
+    },
+    {
+      "id": "function:crates/edge-core/src/mapping.rs:contains_home_target",
+      "type": "function",
+      "filePath": "crates/edge-core/src/mapping.rs",
+      "name": "contains_home_target",
+      "language": "rust",
+      "tags": [],
+      "summary": ""
+    },
+    {
+      "id": "function:crates/edge-core/src/mapping.rs:default",
+      "type": "function",
+      "filePath": "crates/edge-core/src/mapping.rs",
+      "name": "default",
+      "language": "rust",
+      "tags": [],
+      "summary": ""
+    },
+    {
+      "id": "function:crates/edge-core/src/mapping.rs:fmt",
+      "type": "function",
+      "filePath": "crates/edge-core/src/mapping.rs",
+      "name": "fmt",
+      "language": "rust",
+      "tags": [],
+      "summary": ""
+    },
+    {
+      "id": "function:crates/edge-core/src/mapping.rs:from_str",
+      "type": "function",
+      "filePath": "crates/edge-core/src/mapping.rs",
+      "name": "from_str",
+      "language": "rust",
+      "tags": [],
+      "summary": ""
+    },
+    {
+      "id": "function:crates/edge-core/src/mapping.rs:legacy_mapping_json_defaults_to_nft_backend",
+      "type": "function",
+      "filePath": "crates/edge-core/src/mapping.rs",
+      "name": "legacy_mapping_json_defaults_to_nft_backend",
+      "language": "rust",
+      "tags": [],
+      "summary": ""
+    },
+    {
+      "id": "function:crates/edge-core/src/mapping.rs:mapping_defaults_to_nft_backend",
+      "type": "function",
+      "filePath": "crates/edge-core/src/mapping.rs",
+      "name": "mapping_defaults_to_nft_backend",
+      "language": "rust",
+      "tags": [],
+      "summary": ""
+    },
+    {
+      "id": "function:crates/edge-core/src/mapping.rs:mapping_id_rejects_empty_input",
+      "type": "function",
+      "filePath": "crates/edge-core/src/mapping.rs",
+      "name": "mapping_id_rejects_empty_input",
+      "language": "rust",
+      "tags": [],
+      "summary": ""
+    },
+    {
+      "id": "function:crates/edge-core/src/mapping.rs:mapping_uses_snake_case_wire_names",
+      "type": "function",
+      "filePath": "crates/edge-core/src/mapping.rs",
+      "name": "mapping_uses_snake_case_wire_names",
+      "language": "rust",
+      "tags": [],
+      "summary": ""
+    },
+    {
+      "id": "function:crates/edge-core/src/mapping.rs:mark_status",
+      "type": "function",
+      "filePath": "crates/edge-core/src/mapping.rs",
+      "name": "mark_status",
+      "language": "rust",
+      "tags": [],
+      "summary": ""
+    },
+    {
+      "id": "function:crates/edge-core/src/mapping.rs:new",
+      "type": "function",
+      "filePath": "crates/edge-core/src/mapping.rs",
+      "name": "new",
+      "language": "rust",
+      "tags": [],
+      "summary": ""
+    },
+    {
+      "id": "function:crates/edge-core/src/mapping.rs:set_enabled",
+      "type": "function",
+      "filePath": "crates/edge-core/src/mapping.rs",
+      "name": "set_enabled",
+      "language": "rust",
+      "tags": [],
+      "summary": ""
+    },
+    {
+      "id": "function:crates/edge-core/src/mapping.rs:with_id",
+      "type": "function",
+      "filePath": "crates/edge-core/src/mapping.rs",
+      "name": "with_id",
+      "language": "rust",
+      "tags": [],
+      "summary": ""
+    },
+    {
+      "id": "function:crates/edge-core/src/state.rs:config",
+      "type": "function",
+      "filePath": "crates/edge-core/src/state.rs",
+      "name": "config",
+      "language": "rust",
+      "tags": [],
+      "summary": ""
+    },
+    {
+      "id": "function:crates/edge-core/src/state.rs:delete_mapping",
+      "type": "function",
+      "filePath": "crates/edge-core/src/state.rs",
+      "name": "delete_mapping",
+      "language": "rust",
+      "tags": [],
+      "summary": ""
+    },
+    {
+      "id": "function:crates/edge-core/src/state.rs:disabling_mapping_updates_status",
+      "type": "function",
+      "filePath": "crates/edge-core/src/state.rs",
+      "name": "disabling_mapping_updates_status",
+      "language": "rust",
+      "tags": [],
+      "summary": ""
+    },
+    {
+      "id": "function:crates/edge-core/src/state.rs:edge_config",
+      "type": "function",
+      "filePath": "crates/edge-core/src/state.rs",
+      "name": "edge_config",
+      "language": "rust",
+      "tags": [],
+      "summary": ""
+    },
+    {
+      "id": "function:crates/edge-core/src/state.rs:events",
+      "type": "function",
+      "filePath": "crates/edge-core/src/state.rs",
+      "name": "events",
+      "language": "rust",
+      "tags": [],
+      "summary": ""
+    },
+    {
+      "id": "function:crates/edge-core/src/state.rs:generations",
+      "type": "function",
+      "filePath": "crates/edge-core/src/state.rs",
+      "name": "generations",
+      "language": "rust",
+      "tags": [],
+      "summary": ""
+    },
+    {
+      "id": "function:crates/edge-core/src/state.rs:get_mapping",
+      "type": "function",
+      "filePath": "crates/edge-core/src/state.rs",
+      "name": "get_mapping",
+      "language": "rust",
+      "tags": [],
+      "summary": ""
+    },
+    {
+      "id": "function:crates/edge-core/src/state.rs:insert_mapping",
+      "type": "function",
+      "filePath": "crates/edge-core/src/state.rs",
+      "name": "insert_mapping",
+      "language": "rust",
+      "tags": [],
+      "summary": ""
+    },
+    {
+      "id": "function:crates/edge-core/src/state.rs:inserts_and_reads_mapping",
+      "type": "function",
+      "filePath": "crates/edge-core/src/state.rs",
+      "name": "inserts_and_reads_mapping",
+      "language": "rust",
+      "tags": [],
+      "summary": ""
+    },
+    {
+      "id": "function:crates/edge-core/src/state.rs:list_mappings",
+      "type": "function",
+      "filePath": "crates/edge-core/src/state.rs",
+      "name": "list_mappings",
+      "language": "rust",
+      "tags": [],
+      "summary": ""
+    },
+    {
+      "id": "function:crates/edge-core/src/state.rs:mapping",
+      "type": "function",
+      "filePath": "crates/edge-core/src/state.rs",
+      "name": "mapping",
+      "language": "rust",
+      "tags": [],
+      "summary": ""
+    },
+    {
+      "id": "function:crates/edge-core/src/state.rs:new",
+      "type": "function",
+      "filePath": "crates/edge-core/src/state.rs",
+      "name": "new",
+      "language": "rust",
+      "tags": [],
+      "summary": ""
+    },
+    {
+      "id": "function:crates/edge-core/src/state.rs:record_event",
+      "type": "function",
+      "filePath": "crates/edge-core/src/state.rs",
+      "name": "record_event",
+      "language": "rust",
+      "tags": [],
+      "summary": ""
+    },
+    {
+      "id": "function:crates/edge-core/src/state.rs:record_generation",
+      "type": "function",
+      "filePath": "crates/edge-core/src/state.rs",
+      "name": "record_generation",
+      "language": "rust",
+      "tags": [],
+      "summary": ""
+    },
+    {
+      "id": "function:crates/edge-core/src/state.rs:records_generation_and_event_ids",
+      "type": "function",
+      "filePath": "crates/edge-core/src/state.rs",
+      "name": "records_generation_and_event_ids",
+      "language": "rust",
+      "tags": [],
+      "summary": ""
+    },
+    {
+      "id": "function:crates/edge-core/src/state.rs:rejects_duplicate_edge_private_ip",
+      "type": "function",
+      "filePath": "crates/edge-core/src/state.rs",
+      "name": "rejects_duplicate_edge_private_ip",
+      "language": "rust",
+      "tags": [],
+      "summary": ""
+    },
+    {
+      "id": "function:crates/edge-core/src/state.rs:rejects_mapping_before_config",
+      "type": "function",
+      "filePath": "crates/edge-core/src/state.rs",
+      "name": "rejects_mapping_before_config",
+      "language": "rust",
+      "tags": [],
+      "summary": ""
+    },
+    {
+      "id": "function:crates/edge-core/src/state.rs:set_edge_config",
+      "type": "function",
+      "filePath": "crates/edge-core/src/state.rs",
+      "name": "set_edge_config",
+      "language": "rust",
+      "tags": [],
+      "summary": ""
+    },
+    {
+      "id": "function:crates/edge-core/src/state.rs:set_mapping_enabled",
+      "type": "function",
+      "filePath": "crates/edge-core/src/state.rs",
+      "name": "set_mapping_enabled",
+      "language": "rust",
+      "tags": [],
+      "summary": ""
+    },
+    {
+      "id": "function:crates/edge-core/src/state.rs:update_mapping",
+      "type": "function",
+      "filePath": "crates/edge-core/src/state.rs",
+      "name": "update_mapping",
+      "language": "rust",
+      "tags": [],
+      "summary": ""
+    },
+    {
+      "id": "function:crates/edge-core/src/state.rs:validate_mapping_for_write",
+      "type": "function",
+      "filePath": "crates/edge-core/src/state.rs",
+      "name": "validate_mapping_for_write",
+      "language": "rust",
+      "tags": [],
+      "summary": ""
+    },
+    {
+      "id": "function:crates/edge-core/src/validation.rs:accepts_port_forwards_on_shared_edge_private_ip",
+      "type": "function",
+      "filePath": "crates/edge-core/src/validation.rs",
+      "name": "accepts_port_forwards_on_shared_edge_private_ip",
+      "language": "rust",
+      "tags": [],
+      "summary": ""
+    },
+    {
+      "id": "function:crates/edge-core/src/validation.rs:accepts_valid_mapping_inside_home_cidr",
+      "type": "function",
+      "filePath": "crates/edge-core/src/validation.rs",
+      "name": "accepts_valid_mapping_inside_home_cidr",
+      "language": "rust",
+      "tags": [],
+      "summary": ""
+    },
+    {
+      "id": "function:crates/edge-core/src/validation.rs:config",
+      "type": "function",
+      "filePath": "crates/edge-core/src/validation.rs",
+      "name": "config",
+      "language": "rust",
+      "tags": [],
+      "summary": ""
+    },
+    {
+      "id": "function:crates/edge-core/src/validation.rs:conflict_error",
+      "type": "function",
+      "filePath": "crates/edge-core/src/validation.rs",
+      "name": "conflict_error",
+      "language": "rust",
+      "tags": [],
+      "summary": ""
+    },
+    {
+      "id": "function:crates/edge-core/src/validation.rs:conflicts",
+      "type": "function",
+      "filePath": "crates/edge-core/src/validation.rs",
+      "name": "conflicts",
+      "language": "rust",
+      "tags": [],
+      "summary": ""
+    },
+    {
+      "id": "function:crates/edge-core/src/validation.rs:is_network_or_broadcast",
+      "type": "function",
+      "filePath": "crates/edge-core/src/validation.rs",
+      "name": "is_network_or_broadcast",
+      "language": "rust",
+      "tags": [],
+      "summary": ""
+    },
+    {
+      "id": "function:crates/edge-core/src/validation.rs:is_reserved_or_private",
+      "type": "function",
+      "filePath": "crates/edge-core/src/validation.rs",
+      "name": "is_reserved_or_private",
+      "language": "rust",
+      "tags": [],
+      "summary": ""
+    },
+    {
+      "id": "function:crates/edge-core/src/validation.rs:mapping",
+      "type": "function",
+      "filePath": "crates/edge-core/src/validation.rs",
+      "name": "mapping",
+      "language": "rust",
+      "tags": [],
+      "summary": ""
+    },
+    {
+      "id": "function:crates/edge-core/src/validation.rs:rejects_duplicate_port_forward_tuple",
+      "type": "function",
+      "filePath": "crates/edge-core/src/validation.rs",
+      "name": "rejects_duplicate_port_forward_tuple",
+      "language": "rust",
+      "tags": [],
+      "summary": ""
+    },
+    {
+      "id": "function:crates/edge-core/src/validation.rs:rejects_duplicate_public_ip",
+      "type": "function",
+      "filePath": "crates/edge-core/src/validation.rs",
+      "name": "rejects_duplicate_public_ip",
+      "language": "rust",
+      "tags": [],
+      "summary": ""
+    },
+    {
+      "id": "function:crates/edge-core/src/validation.rs:rejects_invalid_public_ip",
+      "type": "function",
+      "filePath": "crates/edge-core/src/validation.rs",
+      "name": "rejects_invalid_public_ip",
+      "language": "rust",
+      "tags": [],
+      "summary": ""
+    },
+    {
+      "id": "function:crates/edge-core/src/validation.rs:rejects_network_and_broadcast_targets",
+      "type": "function",
+      "filePath": "crates/edge-core/src/validation.rs",
+      "name": "rejects_network_and_broadcast_targets",
+      "language": "rust",
+      "tags": [],
+      "summary": ""
+    },
+    {
+      "id": "function:crates/edge-core/src/validation.rs:rejects_port_forward_without_ports",
+      "type": "function",
+      "filePath": "crates/edge-core/src/validation.rs",
+      "name": "rejects_port_forward_without_ports",
+      "language": "rust",
+      "tags": [],
+      "summary": ""
+    },
+    {
+      "id": "function:crates/edge-core/src/validation.rs:rejects_proxy_backend_until_implemented",
+      "type": "function",
+      "filePath": "crates/edge-core/src/validation.rs",
+      "name": "rejects_proxy_backend_until_implemented",
+      "language": "rust",
+      "tags": [],
+      "summary": ""
+    },
+    {
+      "id": "function:crates/edge-core/src/validation.rs:rejects_target_outside_home_cidrs",
+      "type": "function",
+      "filePath": "crates/edge-core/src/validation.rs",
+      "name": "rejects_target_outside_home_cidrs",
+      "language": "rust",
+      "tags": [],
+      "summary": ""
+    },
+    {
+      "id": "function:crates/edge-core/src/validation.rs:rejects_xdp_for_one_to_one_mappings",
+      "type": "function",
+      "filePath": "crates/edge-core/src/validation.rs",
+      "name": "rejects_xdp_for_one_to_one_mappings",
+      "language": "rust",
+      "tags": [],
+      "summary": ""
+    },
+    {
+      "id": "function:crates/edge-core/src/validation.rs:validate_edge_config",
+      "type": "function",
+      "filePath": "crates/edge-core/src/validation.rs",
+      "name": "validate_edge_config",
+      "language": "rust",
+      "tags": [],
+      "summary": ""
+    },
+    {
+      "id": "function:crates/edge-core/src/validation.rs:validate_edge_private_ip",
+      "type": "function",
+      "filePath": "crates/edge-core/src/validation.rs",
+      "name": "validate_edge_private_ip",
+      "language": "rust",
+      "tags": [],
+      "summary": ""
+    },
+    {
+      "id": "function:crates/edge-core/src/validation.rs:validate_interface_name",
+      "type": "function",
+      "filePath": "crates/edge-core/src/validation.rs",
+      "name": "validate_interface_name",
+      "language": "rust",
+      "tags": [],
+      "summary": ""
+    },
+    {
+      "id": "function:crates/edge-core/src/validation.rs:validate_mapping",
+      "type": "function",
+      "filePath": "crates/edge-core/src/validation.rs",
+      "name": "validate_mapping",
+      "language": "rust",
+      "tags": [],
+      "summary": ""
+    },
+    {
+      "id": "function:crates/edge-core/src/validation.rs:validate_mappings",
+      "type": "function",
+      "filePath": "crates/edge-core/src/validation.rs",
+      "name": "validate_mappings",
+      "language": "rust",
+      "tags": [],
+      "summary": ""
+    },
+    {
+      "id": "function:crates/edge-core/src/validation.rs:validate_name",
+      "type": "function",
+      "filePath": "crates/edge-core/src/validation.rs",
+      "name": "validate_name",
+      "language": "rust",
+      "tags": [],
+      "summary": ""
+    },
+    {
+      "id": "function:crates/edge-core/src/validation.rs:validate_public_ip",
+      "type": "function",
+      "filePath": "crates/edge-core/src/validation.rs",
+      "name": "validate_public_ip",
+      "language": "rust",
+      "tags": [],
+      "summary": ""
+    },
+    {
+      "id": "function:crates/edge-core/src/validation.rs:validate_target_ip",
+      "type": "function",
+      "filePath": "crates/edge-core/src/validation.rs",
+      "name": "validate_target_ip",
+      "language": "rust",
+      "tags": [],
+      "summary": ""
+    },
+    {
+      "id": "function:crates/edge-nft/src/apply.rs:apply_file",
+      "type": "function",
+      "filePath": "crates/edge-nft/src/apply.rs",
+      "name": "apply_file",
+      "language": "rust",
+      "tags": [],
+      "summary": ""
+    },
+    {
+      "id": "function:crates/edge-nft/src/apply.rs:check_file",
+      "type": "function",
+      "filePath": "crates/edge-nft/src/apply.rs",
+      "name": "check_file",
+      "language": "rust",
+      "tags": [],
+      "summary": ""
+    },
+    {
+      "id": "function:crates/edge-nft/src/apply.rs:default",
+      "type": "function",
+      "filePath": "crates/edge-nft/src/apply.rs",
+      "name": "default",
+      "language": "rust",
+      "tags": [],
+      "summary": ""
+    },
+    {
+      "id": "function:crates/edge-nft/src/apply.rs:error_message",
+      "type": "function",
+      "filePath": "crates/edge-nft/src/apply.rs",
+      "name": "error_message",
+      "language": "rust",
+      "tags": [],
+      "summary": ""
+    },
+    {
+      "id": "function:crates/edge-nft/src/apply.rs:is_success",
+      "type": "function",
+      "filePath": "crates/edge-nft/src/apply.rs",
+      "name": "is_success",
+      "language": "rust",
+      "tags": [],
+      "summary": ""
+    },
+    {
+      "id": "function:crates/edge-nft/src/apply.rs:new",
+      "type": "function",
+      "filePath": "crates/edge-nft/src/apply.rs",
+      "name": "new",
+      "language": "rust",
+      "tags": [],
+      "summary": ""
+    },
+    {
+      "id": "function:crates/edge-nft/src/apply.rs:reports_command_failure",
+      "type": "function",
+      "filePath": "crates/edge-nft/src/apply.rs",
+      "name": "reports_command_failure",
+      "language": "rust",
+      "tags": [],
+      "summary": ""
+    },
+    {
+      "id": "function:crates/edge-nft/src/apply.rs:run",
+      "type": "function",
+      "filePath": "crates/edge-nft/src/apply.rs",
+      "name": "run",
+      "language": "rust",
+      "tags": [],
+      "summary": ""
+    },
+    {
+      "id": "function:crates/edge-nft/src/apply.rs:with_timeout",
+      "type": "function",
+      "filePath": "crates/edge-nft/src/apply.rs",
+      "name": "with_timeout",
+      "language": "rust",
+      "tags": [],
+      "summary": ""
+    },
+    {
+      "id": "function:crates/edge-nft/src/render.rs:default",
+      "type": "function",
+      "filePath": "crates/edge-nft/src/render.rs",
+      "name": "default",
+      "language": "rust",
+      "tags": [],
+      "summary": ""
+    },
+    {
+      "id": "function:crates/edge-nft/src/render.rs:explicit_nft_backend_preserves_rendered_output",
+      "type": "function",
+      "filePath": "crates/edge-nft/src/render.rs",
+      "name": "explicit_nft_backend_preserves_rendered_output",
+      "language": "rust",
+      "tags": [],
+      "summary": ""
+    },
+    {
+      "id": "function:crates/edge-nft/src/render.rs:nft_protocol",
+      "type": "function",
+      "filePath": "crates/edge-nft/src/render.rs",
+      "name": "nft_protocol",
+      "language": "rust",
+      "tags": [],
+      "summary": ""
+    },
+    {
+      "id": "function:crates/edge-nft/src/render.rs:render_nftables",
+      "type": "function",
+      "filePath": "crates/edge-nft/src/render.rs",
+      "name": "render_nftables",
+      "language": "rust",
+      "tags": [],
+      "summary": ""
+    },
+    {
+      "id": "function:crates/edge-nft/src/render.rs:renders_port_forward_rules",
+      "type": "function",
+      "filePath": "crates/edge-nft/src/render.rs",
+      "name": "renders_port_forward_rules",
+      "language": "rust",
+      "tags": [],
+      "summary": ""
+    },
+    {
+      "id": "function:crates/edge-nft/src/render.rs:renders_static_mapping_rules",
+      "type": "function",
+      "filePath": "crates/edge-nft/src/render.rs",
+      "name": "renders_static_mapping_rules",
+      "language": "rust",
+      "tags": [],
+      "summary": ""
+    }
+  ],
+  "edges": [
+    {
+      "source": "file:crates/edge-agent/src/api.rs",
+      "target": "file:crates/edge-core/src/lib.rs",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-agent/src/api.rs",
+      "target": "file:crates/edge-nft/src/lib.rs",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-agent/src/api.rs",
+      "target": "file:crates/edge-reconcile/src/lib.rs",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-agent/src/api.rs",
+      "target": "file:crates/edge-store/src/lib.rs",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-agent/src/api.rs",
+      "target": "file:crates/edge-tailscale/src/lib.rs",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-agent/src/api.rs",
+      "target": "file:crates/edge-xdp/src/lib.rs",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-agent/src/api.rs",
+      "target": "file:external:axum::extract::{Path, State}",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-agent/src/api.rs",
+      "target": "file:external:axum::http::{HeaderMap, StatusCode}",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-agent/src/api.rs",
+      "target": "file:external:axum::response::{IntoResponse, Response}",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-agent/src/api.rs",
+      "target": "file:external:axum::routing::{get, post}",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-agent/src/api.rs",
+      "target": "file:external:axum::{Json, Router}",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-agent/src/api.rs",
+      "target": "file:external:serde::{Deserialize, Serialize}",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-agent/src/api.rs",
+      "target": "file:external:std::net::Ipv4Addr",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-agent/src/api.rs",
+      "target": "file:external:std::path::PathBuf",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-agent/src/api.rs",
+      "target": "file:external:std::str::FromStr",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-agent/src/api.rs",
+      "target": "file:external:std::sync::Arc",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-agent/src/main.rs",
+      "target": "file:crates/edge-agent/src/api.rs",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-agent/src/main.rs",
+      "target": "file:crates/edge-core/src/lib.rs",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-agent/src/main.rs",
+      "target": "file:crates/edge-store/src/lib.rs",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-agent/src/main.rs",
+      "target": "file:external:anyhow::{Context, Result}",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-agent/src/main.rs",
+      "target": "file:external:clap::Parser",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-agent/src/main.rs",
+      "target": "file:external:ipnet::Ipv4Net",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-agent/src/main.rs",
+      "target": "file:external:serde::Deserialize",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-agent/src/main.rs",
+      "target": "file:external:std::net::{IpAddr, SocketAddr}",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-agent/src/main.rs",
+      "target": "file:external:std::path::{Path, PathBuf}",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-agent/src/main.rs",
+      "target": "file:external:tower_http::trace::TraceLayer",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-agent/src/main.rs",
+      "target": "file:external:tracing_subscriber::EnvFilter",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-cli/src/main.rs",
+      "target": "file:crates/edge-core/src/lib.rs",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-cli/src/main.rs",
+      "target": "file:crates/edge-nft/src/lib.rs",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-cli/src/main.rs",
+      "target": "file:crates/edge-oci/src/lib.rs",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-cli/src/main.rs",
+      "target": "file:crates/edge-reconcile/src/lib.rs",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-cli/src/main.rs",
+      "target": "file:crates/edge-store/src/lib.rs",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-cli/src/main.rs",
+      "target": "file:crates/edge-tailscale/src/lib.rs",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-cli/src/main.rs",
+      "target": "file:crates/edge-xdp/src/lib.rs",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-cli/src/main.rs",
+      "target": "file:external:anyhow::{Context, Result}",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-cli/src/main.rs",
+      "target": "file:external:clap::{Args, Parser, Subcommand}",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-cli/src/main.rs",
+      "target": "file:external:ipnet::Ipv4Net",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-cli/src/main.rs",
+      "target": "file:external:serde::Deserialize",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-cli/src/main.rs",
+      "target": "file:external:std::net::Ipv4Addr",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-cli/src/main.rs",
+      "target": "file:external:std::path::PathBuf",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-cli/src/main.rs",
+      "target": "file:external:std::str::FromStr",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/errors.rs",
+      "target": "file:crates/edge-core/src/mapping.rs",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/errors.rs",
+      "target": "file:external:std::net::Ipv4Addr",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/errors.rs",
+      "target": "file:external:thiserror::Error",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/errors.rs",
+      "target": "function:crates/edge-core/src/errors.rs:store",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/errors.rs",
+      "target": "function:crates/edge-core/src/errors.rs:validation",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/errors.rs::EdgeCoreError",
+      "target": "function:crates/edge-core/src/errors.rs:store",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/errors.rs::EdgeCoreError",
+      "target": "function:crates/edge-core/src/errors.rs:validation",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/lib.rs",
+      "target": "file:crates/edge-core/src/errors.rs",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/lib.rs",
+      "target": "file:crates/edge-core/src/mapping.rs",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/lib.rs",
+      "target": "file:crates/edge-core/src/state.rs",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/lib.rs",
+      "target": "file:crates/edge-core/src/validation.rs",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/mapping.rs",
+      "target": "file:crates/edge-core/src/errors.rs",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/mapping.rs",
+      "target": "file:external:ipnet::Ipv4Net",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/mapping.rs",
+      "target": "file:external:serde::{Deserialize, Serialize}",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/mapping.rs",
+      "target": "file:external:std::fmt",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/mapping.rs",
+      "target": "file:external:std::net::Ipv4Addr",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/mapping.rs",
+      "target": "file:external:std::str::FromStr",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/mapping.rs",
+      "target": "file:external:time::OffsetDateTime",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/mapping.rs",
+      "target": "file:external:uuid::Uuid",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/mapping.rs",
+      "target": "function:crates/edge-core/src/mapping.rs:as_str",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/mapping.rs",
+      "target": "function:crates/edge-core/src/mapping.rs:contains_home_target",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/mapping.rs",
+      "target": "function:crates/edge-core/src/mapping.rs:default",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/mapping.rs",
+      "target": "function:crates/edge-core/src/mapping.rs:fmt",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/mapping.rs",
+      "target": "function:crates/edge-core/src/mapping.rs:from_str",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/mapping.rs",
+      "target": "function:crates/edge-core/src/mapping.rs:legacy_mapping_json_defaults_to_nft_backend",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/mapping.rs",
+      "target": "function:crates/edge-core/src/mapping.rs:mapping_defaults_to_nft_backend",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/mapping.rs",
+      "target": "function:crates/edge-core/src/mapping.rs:mapping_id_rejects_empty_input",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/mapping.rs",
+      "target": "function:crates/edge-core/src/mapping.rs:mapping_uses_snake_case_wire_names",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/mapping.rs",
+      "target": "function:crates/edge-core/src/mapping.rs:mark_status",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/mapping.rs",
+      "target": "function:crates/edge-core/src/mapping.rs:new",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/mapping.rs",
+      "target": "function:crates/edge-core/src/mapping.rs:set_enabled",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/mapping.rs",
+      "target": "function:crates/edge-core/src/mapping.rs:with_id",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/mapping.rs::EdgeConfig",
+      "target": "function:crates/edge-core/src/mapping.rs:contains_home_target",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/mapping.rs::EdgeConfig",
+      "target": "function:crates/edge-core/src/mapping.rs:new",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/mapping.rs::Mapping",
+      "target": "function:crates/edge-core/src/mapping.rs:mark_status",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/mapping.rs::Mapping",
+      "target": "function:crates/edge-core/src/mapping.rs:new",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/mapping.rs::Mapping",
+      "target": "function:crates/edge-core/src/mapping.rs:set_enabled",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/mapping.rs::Mapping",
+      "target": "function:crates/edge-core/src/mapping.rs:with_id",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/mapping.rs::MappingBackend",
+      "target": "function:crates/edge-core/src/mapping.rs:from_str",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/mapping.rs::MappingId",
+      "target": "function:crates/edge-core/src/mapping.rs:as_str",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/mapping.rs::MappingId",
+      "target": "function:crates/edge-core/src/mapping.rs:default",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/mapping.rs::MappingId",
+      "target": "function:crates/edge-core/src/mapping.rs:fmt",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/mapping.rs::MappingId",
+      "target": "function:crates/edge-core/src/mapping.rs:from_str",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/mapping.rs::MappingId",
+      "target": "function:crates/edge-core/src/mapping.rs:new",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/mapping.rs::MappingMode",
+      "target": "function:crates/edge-core/src/mapping.rs:from_str",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/mapping.rs::OciAuthMode",
+      "target": "function:crates/edge-core/src/mapping.rs:from_str",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/mapping.rs::Protocol",
+      "target": "function:crates/edge-core/src/mapping.rs:from_str",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/mapping.rs::tests",
+      "target": "function:crates/edge-core/src/mapping.rs:legacy_mapping_json_defaults_to_nft_backend",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/mapping.rs::tests",
+      "target": "function:crates/edge-core/src/mapping.rs:mapping_defaults_to_nft_backend",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/mapping.rs::tests",
+      "target": "function:crates/edge-core/src/mapping.rs:mapping_id_rejects_empty_input",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/mapping.rs::tests",
+      "target": "function:crates/edge-core/src/mapping.rs:mapping_uses_snake_case_wire_names",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/state.rs",
+      "target": "file:crates/edge-core/src/errors.rs",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/state.rs",
+      "target": "file:crates/edge-core/src/mapping.rs",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/state.rs",
+      "target": "file:crates/edge-core/src/validation.rs",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/state.rs",
+      "target": "file:external:serde::{Deserialize, Serialize}",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/state.rs",
+      "target": "file:external:std::collections::BTreeMap",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/state.rs",
+      "target": "file:external:time::OffsetDateTime",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/state.rs",
+      "target": "function:crates/edge-core/src/state.rs:config",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/state.rs",
+      "target": "function:crates/edge-core/src/state.rs:delete_mapping",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/state.rs",
+      "target": "function:crates/edge-core/src/state.rs:disabling_mapping_updates_status",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/state.rs",
+      "target": "function:crates/edge-core/src/state.rs:edge_config",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/state.rs",
+      "target": "function:crates/edge-core/src/state.rs:events",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/state.rs",
+      "target": "function:crates/edge-core/src/state.rs:generations",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/state.rs",
+      "target": "function:crates/edge-core/src/state.rs:get_mapping",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/state.rs",
+      "target": "function:crates/edge-core/src/state.rs:insert_mapping",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/state.rs",
+      "target": "function:crates/edge-core/src/state.rs:inserts_and_reads_mapping",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/state.rs",
+      "target": "function:crates/edge-core/src/state.rs:list_mappings",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/state.rs",
+      "target": "function:crates/edge-core/src/state.rs:mapping",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/state.rs",
+      "target": "function:crates/edge-core/src/state.rs:new",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/state.rs",
+      "target": "function:crates/edge-core/src/state.rs:record_event",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/state.rs",
+      "target": "function:crates/edge-core/src/state.rs:record_generation",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/state.rs",
+      "target": "function:crates/edge-core/src/state.rs:records_generation_and_event_ids",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/state.rs",
+      "target": "function:crates/edge-core/src/state.rs:rejects_duplicate_edge_private_ip",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/state.rs",
+      "target": "function:crates/edge-core/src/state.rs:rejects_mapping_before_config",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/state.rs",
+      "target": "function:crates/edge-core/src/state.rs:set_edge_config",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/state.rs",
+      "target": "function:crates/edge-core/src/state.rs:set_mapping_enabled",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/state.rs",
+      "target": "function:crates/edge-core/src/state.rs:update_mapping",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/state.rs",
+      "target": "function:crates/edge-core/src/state.rs:validate_mapping_for_write",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/state.rs::InMemoryStateStore",
+      "target": "function:crates/edge-core/src/state.rs:delete_mapping",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/state.rs::InMemoryStateStore",
+      "target": "function:crates/edge-core/src/state.rs:edge_config",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/state.rs::InMemoryStateStore",
+      "target": "function:crates/edge-core/src/state.rs:events",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/state.rs::InMemoryStateStore",
+      "target": "function:crates/edge-core/src/state.rs:generations",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/state.rs::InMemoryStateStore",
+      "target": "function:crates/edge-core/src/state.rs:get_mapping",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/state.rs::InMemoryStateStore",
+      "target": "function:crates/edge-core/src/state.rs:insert_mapping",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/state.rs::InMemoryStateStore",
+      "target": "function:crates/edge-core/src/state.rs:list_mappings",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/state.rs::InMemoryStateStore",
+      "target": "function:crates/edge-core/src/state.rs:new",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/state.rs::InMemoryStateStore",
+      "target": "function:crates/edge-core/src/state.rs:record_event",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/state.rs::InMemoryStateStore",
+      "target": "function:crates/edge-core/src/state.rs:record_generation",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/state.rs::InMemoryStateStore",
+      "target": "function:crates/edge-core/src/state.rs:set_edge_config",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/state.rs::InMemoryStateStore",
+      "target": "function:crates/edge-core/src/state.rs:set_mapping_enabled",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/state.rs::InMemoryStateStore",
+      "target": "function:crates/edge-core/src/state.rs:update_mapping",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/state.rs::InMemoryStateStore",
+      "target": "function:crates/edge-core/src/state.rs:validate_mapping_for_write",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/state.rs::tests",
+      "target": "function:crates/edge-core/src/state.rs:config",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/state.rs::tests",
+      "target": "function:crates/edge-core/src/state.rs:disabling_mapping_updates_status",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/state.rs::tests",
+      "target": "function:crates/edge-core/src/state.rs:inserts_and_reads_mapping",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/state.rs::tests",
+      "target": "function:crates/edge-core/src/state.rs:mapping",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/state.rs::tests",
+      "target": "function:crates/edge-core/src/state.rs:records_generation_and_event_ids",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/state.rs::tests",
+      "target": "function:crates/edge-core/src/state.rs:rejects_duplicate_edge_private_ip",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/state.rs::tests",
+      "target": "function:crates/edge-core/src/state.rs:rejects_mapping_before_config",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/validation.rs",
+      "target": "file:crates/edge-core/src/errors.rs",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/validation.rs",
+      "target": "file:crates/edge-core/src/mapping.rs",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/validation.rs",
+      "target": "file:external:ipnet::Ipv4Net",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/validation.rs",
+      "target": "file:external:std::collections::HashSet",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/validation.rs",
+      "target": "file:external:std::net::Ipv4Addr",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/validation.rs",
+      "target": "function:crates/edge-core/src/validation.rs:accepts_port_forwards_on_shared_edge_private_ip",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/validation.rs",
+      "target": "function:crates/edge-core/src/validation.rs:accepts_valid_mapping_inside_home_cidr",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/validation.rs",
+      "target": "function:crates/edge-core/src/validation.rs:config",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/validation.rs",
+      "target": "function:crates/edge-core/src/validation.rs:conflict_error",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/validation.rs",
+      "target": "function:crates/edge-core/src/validation.rs:conflicts",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/validation.rs",
+      "target": "function:crates/edge-core/src/validation.rs:is_network_or_broadcast",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/validation.rs",
+      "target": "function:crates/edge-core/src/validation.rs:is_reserved_or_private",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/validation.rs",
+      "target": "function:crates/edge-core/src/validation.rs:mapping",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/validation.rs",
+      "target": "function:crates/edge-core/src/validation.rs:rejects_duplicate_port_forward_tuple",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/validation.rs",
+      "target": "function:crates/edge-core/src/validation.rs:rejects_duplicate_public_ip",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/validation.rs",
+      "target": "function:crates/edge-core/src/validation.rs:rejects_invalid_public_ip",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/validation.rs",
+      "target": "function:crates/edge-core/src/validation.rs:rejects_network_and_broadcast_targets",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/validation.rs",
+      "target": "function:crates/edge-core/src/validation.rs:rejects_port_forward_without_ports",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/validation.rs",
+      "target": "function:crates/edge-core/src/validation.rs:rejects_proxy_backend_until_implemented",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/validation.rs",
+      "target": "function:crates/edge-core/src/validation.rs:rejects_target_outside_home_cidrs",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/validation.rs",
+      "target": "function:crates/edge-core/src/validation.rs:rejects_xdp_for_one_to_one_mappings",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/validation.rs",
+      "target": "function:crates/edge-core/src/validation.rs:validate_edge_config",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/validation.rs",
+      "target": "function:crates/edge-core/src/validation.rs:validate_edge_private_ip",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/validation.rs",
+      "target": "function:crates/edge-core/src/validation.rs:validate_interface_name",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/validation.rs",
+      "target": "function:crates/edge-core/src/validation.rs:validate_mapping",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/validation.rs",
+      "target": "function:crates/edge-core/src/validation.rs:validate_mappings",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/validation.rs",
+      "target": "function:crates/edge-core/src/validation.rs:validate_name",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/validation.rs",
+      "target": "function:crates/edge-core/src/validation.rs:validate_public_ip",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/validation.rs",
+      "target": "function:crates/edge-core/src/validation.rs:validate_target_ip",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/validation.rs::tests",
+      "target": "function:crates/edge-core/src/validation.rs:accepts_port_forwards_on_shared_edge_private_ip",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/validation.rs::tests",
+      "target": "function:crates/edge-core/src/validation.rs:accepts_valid_mapping_inside_home_cidr",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/validation.rs::tests",
+      "target": "function:crates/edge-core/src/validation.rs:config",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/validation.rs::tests",
+      "target": "function:crates/edge-core/src/validation.rs:mapping",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/validation.rs::tests",
+      "target": "function:crates/edge-core/src/validation.rs:rejects_duplicate_port_forward_tuple",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/validation.rs::tests",
+      "target": "function:crates/edge-core/src/validation.rs:rejects_duplicate_public_ip",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/validation.rs::tests",
+      "target": "function:crates/edge-core/src/validation.rs:rejects_invalid_public_ip",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/validation.rs::tests",
+      "target": "function:crates/edge-core/src/validation.rs:rejects_network_and_broadcast_targets",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/validation.rs::tests",
+      "target": "function:crates/edge-core/src/validation.rs:rejects_port_forward_without_ports",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/validation.rs::tests",
+      "target": "function:crates/edge-core/src/validation.rs:rejects_proxy_backend_until_implemented",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/validation.rs::tests",
+      "target": "function:crates/edge-core/src/validation.rs:rejects_target_outside_home_cidrs",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-core/src/validation.rs::tests",
+      "target": "function:crates/edge-core/src/validation.rs:rejects_xdp_for_one_to_one_mappings",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-linux/src/lib.rs",
+      "target": "file:external:std::net::Ipv4Addr",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-linux/src/lib.rs",
+      "target": "file:external:std::path::PathBuf",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-linux/src/lib.rs",
+      "target": "file:external:std::time::Duration",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-linux/src/lib.rs",
+      "target": "file:external:thiserror::Error",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-linux/src/lib.rs",
+      "target": "file:external:tokio::process::Command",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-linux/src/lib.rs",
+      "target": "file:external:tokio::time::timeout",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-nft/src/apply.rs",
+      "target": "file:external:std::path::{Path, PathBuf}",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-nft/src/apply.rs",
+      "target": "file:external:std::time::Duration",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-nft/src/apply.rs",
+      "target": "file:external:thiserror::Error",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-nft/src/apply.rs",
+      "target": "file:external:tokio::process::Command",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-nft/src/apply.rs",
+      "target": "file:external:tokio::time::timeout",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-nft/src/apply.rs",
+      "target": "function:crates/edge-nft/src/apply.rs:apply_file",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-nft/src/apply.rs",
+      "target": "function:crates/edge-nft/src/apply.rs:check_file",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-nft/src/apply.rs",
+      "target": "function:crates/edge-nft/src/apply.rs:default",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-nft/src/apply.rs",
+      "target": "function:crates/edge-nft/src/apply.rs:error_message",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-nft/src/apply.rs",
+      "target": "function:crates/edge-nft/src/apply.rs:is_success",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-nft/src/apply.rs",
+      "target": "function:crates/edge-nft/src/apply.rs:new",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-nft/src/apply.rs",
+      "target": "function:crates/edge-nft/src/apply.rs:reports_command_failure",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-nft/src/apply.rs",
+      "target": "function:crates/edge-nft/src/apply.rs:run",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-nft/src/apply.rs",
+      "target": "function:crates/edge-nft/src/apply.rs:with_timeout",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-nft/src/apply.rs::Nft",
+      "target": "function:crates/edge-nft/src/apply.rs:apply_file",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-nft/src/apply.rs::Nft",
+      "target": "function:crates/edge-nft/src/apply.rs:check_file",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-nft/src/apply.rs::Nft",
+      "target": "function:crates/edge-nft/src/apply.rs:default",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-nft/src/apply.rs::Nft",
+      "target": "function:crates/edge-nft/src/apply.rs:new",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-nft/src/apply.rs::Nft",
+      "target": "function:crates/edge-nft/src/apply.rs:run",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-nft/src/apply.rs::Nft",
+      "target": "function:crates/edge-nft/src/apply.rs:with_timeout",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-nft/src/apply.rs::NftCommand",
+      "target": "function:crates/edge-nft/src/apply.rs:error_message",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-nft/src/apply.rs::NftCommand",
+      "target": "function:crates/edge-nft/src/apply.rs:is_success",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-nft/src/apply.rs::tests",
+      "target": "function:crates/edge-nft/src/apply.rs:reports_command_failure",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-nft/src/lib.rs",
+      "target": "file:crates/edge-nft/src/apply.rs",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-nft/src/lib.rs",
+      "target": "file:crates/edge-nft/src/render.rs",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-nft/src/render.rs",
+      "target": "file:crates/edge-core/src/lib.rs",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-nft/src/render.rs",
+      "target": "file:crates/edge-core/src/validation.rs",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-nft/src/render.rs",
+      "target": "function:crates/edge-nft/src/render.rs:default",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-nft/src/render.rs",
+      "target": "function:crates/edge-nft/src/render.rs:explicit_nft_backend_preserves_rendered_output",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-nft/src/render.rs",
+      "target": "function:crates/edge-nft/src/render.rs:nft_protocol",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-nft/src/render.rs",
+      "target": "function:crates/edge-nft/src/render.rs:render_nftables",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-nft/src/render.rs",
+      "target": "function:crates/edge-nft/src/render.rs:renders_port_forward_rules",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-nft/src/render.rs",
+      "target": "function:crates/edge-nft/src/render.rs:renders_static_mapping_rules",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-nft/src/render.rs::NftRenderConfig",
+      "target": "function:crates/edge-nft/src/render.rs:default",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-nft/src/render.rs::tests",
+      "target": "function:crates/edge-nft/src/render.rs:explicit_nft_backend_preserves_rendered_output",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-nft/src/render.rs::tests",
+      "target": "function:crates/edge-nft/src/render.rs:renders_port_forward_rules",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-nft/src/render.rs::tests",
+      "target": "function:crates/edge-nft/src/render.rs:renders_static_mapping_rules",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-oci/src/lib.rs",
+      "target": "file:external:serde::{Deserialize, Serialize}",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-oci/src/lib.rs",
+      "target": "file:external:std::net::Ipv4Addr",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-oci/src/lib.rs",
+      "target": "file:external:std::path::PathBuf",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-oci/src/lib.rs",
+      "target": "file:external:thiserror::Error",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-oci/src/lib.rs",
+      "target": "file:external:tokio::process::Command",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-reconcile/src/lib.rs",
+      "target": "file:crates/edge-core/src/lib.rs",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-reconcile/src/lib.rs",
+      "target": "file:crates/edge-linux/src/lib.rs",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-reconcile/src/lib.rs",
+      "target": "file:crates/edge-nft/src/lib.rs",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-reconcile/src/lib.rs",
+      "target": "file:crates/edge-store/src/lib.rs",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-reconcile/src/lib.rs",
+      "target": "file:crates/edge-xdp/src/lib.rs",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-reconcile/src/lib.rs",
+      "target": "file:external:std::fs::OpenOptions",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-reconcile/src/lib.rs",
+      "target": "file:external:std::io::Write",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-reconcile/src/lib.rs",
+      "target": "file:external:std::net::SocketAddr",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-reconcile/src/lib.rs",
+      "target": "file:external:std::path::{Path, PathBuf}",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-reconcile/src/lib.rs",
+      "target": "file:external:std::time::Duration",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-reconcile/src/lib.rs",
+      "target": "file:external:thiserror::Error",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-reconcile/src/lib.rs",
+      "target": "file:external:time::OffsetDateTime",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-reconcile/src/lib.rs",
+      "target": "file:external:tokio::net::TcpStream",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-reconcile/src/lib.rs",
+      "target": "file:external:tokio::time::timeout",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-store/src/lib.rs",
+      "target": "file:crates/edge-core/src/lib.rs",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-store/src/lib.rs",
+      "target": "file:crates/edge-core/src/state.rs",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-store/src/lib.rs",
+      "target": "file:crates/edge-core/src/validation.rs",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-store/src/lib.rs",
+      "target": "file:external:sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions}",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-store/src/lib.rs",
+      "target": "file:external:sqlx::{Row, SqlitePool}",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-store/src/lib.rs",
+      "target": "file:external:std::net::Ipv4Addr",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-store/src/lib.rs",
+      "target": "file:external:std::path::Path",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-store/src/lib.rs",
+      "target": "file:external:std::str::FromStr",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-store/src/lib.rs",
+      "target": "file:external:time::OffsetDateTime",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-store/src/lib.rs",
+      "target": "file:external:time::format_description::well_known::Rfc3339",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-tailscale/src/lib.rs",
+      "target": "file:external:serde::{Deserialize, Serialize}",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-tailscale/src/lib.rs",
+      "target": "file:external:std::collections::BTreeMap",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-tailscale/src/lib.rs",
+      "target": "file:external:std::net::Ipv4Addr",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-tailscale/src/lib.rs",
+      "target": "file:external:std::path::PathBuf",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-tailscale/src/lib.rs",
+      "target": "file:external:thiserror::Error",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-tailscale/src/lib.rs",
+      "target": "file:external:tokio::process::Command",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-xdp/src/lib.rs",
+      "target": "file:crates/edge-core/src/lib.rs",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-xdp/src/lib.rs",
+      "target": "file:external:serde::{Deserialize, Serialize}",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-xdp/src/lib.rs",
+      "target": "file:external:std::net::Ipv4Addr",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-xdp/src/lib.rs",
+      "target": "file:external:std::path::PathBuf",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:crates/edge-xdp/src/lib.rs",
+      "target": "file:external:thiserror::Error",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 1.0
+    }
+  ],
+  "layers": [
+    {
+      "id": "layer:cli",
+      "name": "Command Line Interface",
+      "description": "Provides the primary user-facing entry point for interacting with the edge system via terminal commands.",
+      "nodeIds": [
+        "file:crates/edge-cli/src/main.rs"
+      ],
+      "display_order": 0,
+      "order_basis": "imports"
+    },
+    {
+      "id": "layer:config",
+      "name": "Project Configuration Management",
+      "description": "Contains CI/CD pipeline definitions and template configuration files for environment setup.",
+      "nodeIds": [
+        "file:.github/workflows/ci.yml",
+        "file:.github/workflows/release.yml",
+        "file:config/config.example.toml"
+      ],
+      "display_order": 1,
+      "order_basis": "imports"
+    },
+    {
+      "id": "layer:application",
+      "name": "Core Application Logic",
+      "description": "Houses the primary business logic, state management, NFT processing, and integration modules for the edge platform.",
+      "nodeIds": [
+        "file:Cargo.toml",
+        "file:README.md",
+        "file:crates/edge-agent/Cargo.toml",
+        "file:crates/edge-agent/src/api.rs",
+        "file:crates/edge-agent/src/main.rs",
+        "file:crates/edge-cli/Cargo.toml",
+        "file:crates/edge-core/Cargo.toml",
+        "file:crates/edge-core/src/errors.rs",
+        "file:crates/edge-core/src/lib.rs",
+        "file:crates/edge-core/src/mapping.rs",
+        "file:crates/edge-core/src/state.rs",
+        "file:crates/edge-core/src/validation.rs",
+        "file:crates/edge-linux/Cargo.toml",
+        "file:crates/edge-linux/src/lib.rs",
+        "file:crates/edge-nft/Cargo.toml",
+        "file:crates/edge-nft/src/apply.rs",
+        "file:crates/edge-nft/src/lib.rs",
+        "file:crates/edge-nft/src/render.rs",
+        "file:crates/edge-oci/Cargo.toml",
+        "file:crates/edge-oci/src/lib.rs",
+        "file:crates/edge-reconcile/Cargo.toml",
+        "file:crates/edge-reconcile/src/lib.rs",
+        "file:crates/edge-store/Cargo.toml",
+        "file:crates/edge-store/migrations/0001_init.sql",
+        "file:crates/edge-store/src/lib.rs",
+        "file:crates/edge-tailscale/Cargo.toml",
+        "file:crates/edge-tailscale/src/lib.rs",
+        "file:crates/edge-xdp/Cargo.toml",
+        "file:crates/edge-xdp/src/lib.rs",
+        "file:docs/ci.md",
+        "file:docs/deployment.md",
+        "file:docs/recovery.md",
+        "file:docs/xdp.md",
+        "file:scripts/install.sh",
+        "file:scripts/linux-arm64-nft-check.sh",
+        "file:scripts/linux-arm64-test.sh",
+        "file:scripts/nft-min-check.sh"
+      ],
+      "display_order": 2,
+      "order_basis": "imports"
+    }
+  ],
+  "tour": [
+    {
+      "order": 1,
+      "target_path": "README.md",
+      "page_type": "repo_overview",
+      "title": "README.md",
+      "depth": 0,
+      "kind": "overview",
+      "reason": "Start here for the end-to-end picture before diving into the code.",
+      "layer_id": "layer:application"
+    },
+    {
+      "order": 2,
+      "target_path": "crates/edge-agent/src/main.rs",
+      "page_type": "file_page",
+      "title": "main.rs",
+      "depth": 0,
+      "kind": "code",
+      "reason": "An entry point \u2014 execution and imports fan out from here.",
+      "layer_id": "layer:application"
+    },
+    {
+      "order": 3,
+      "target_path": "crates/edge-cli/src/main.rs",
+      "page_type": "file_page",
+      "title": "main.rs",
+      "depth": 0,
+      "kind": "code",
+      "reason": "An entry point \u2014 execution and imports fan out from here.",
+      "layer_id": "layer:cli"
+    },
+    {
+      "order": 4,
+      "target_path": "crates/edge-core/src/lib.rs",
+      "page_type": "file_page",
+      "title": "lib.rs",
+      "depth": 0,
+      "kind": "code",
+      "reason": "An entry point \u2014 execution and imports fan out from here.",
+      "layer_id": "layer:application"
+    },
+    {
+      "order": 5,
+      "target_path": "crates/edge-xdp/src/lib.rs",
+      "page_type": "file_page",
+      "title": "lib.rs",
+      "depth": 0,
+      "kind": "code",
+      "reason": "An entry point \u2014 execution and imports fan out from here.",
+      "layer_id": "layer:application"
+    },
+    {
+      "order": 6,
+      "target_path": "crates/edge-store/src/lib.rs",
+      "page_type": "file_page",
+      "title": "lib.rs",
+      "depth": 0,
+      "kind": "code",
+      "reason": "An entry point \u2014 execution and imports fan out from here.",
+      "layer_id": "layer:application"
+    },
+    {
+      "order": 7,
+      "target_path": "crates/edge-tailscale/src/lib.rs",
+      "page_type": "file_page",
+      "title": "lib.rs",
+      "depth": 0,
+      "kind": "code",
+      "reason": "An entry point \u2014 execution and imports fan out from here.",
+      "layer_id": "layer:application"
+    },
+    {
+      "order": 8,
+      "target_path": "crates/edge-oci/src/lib.rs",
+      "page_type": "file_page",
+      "title": "lib.rs",
+      "depth": 0,
+      "kind": "code",
+      "reason": "An entry point \u2014 execution and imports fan out from here.",
+      "layer_id": "layer:application"
+    },
+    {
+      "order": 9,
+      "target_path": "crates/edge-linux/src/lib.rs",
+      "page_type": "file_page",
+      "title": "lib.rs",
+      "depth": 0,
+      "kind": "code",
+      "reason": "An entry point \u2014 execution and imports fan out from here.",
+      "layer_id": "layer:application"
+    },
+    {
+      "order": 10,
+      "target_path": "crates/edge-nft/src/lib.rs",
+      "page_type": "file_page",
+      "title": "lib.rs",
+      "depth": 0,
+      "kind": "code",
+      "reason": "An entry point \u2014 execution and imports fan out from here.",
+      "layer_id": "layer:application"
+    },
+    {
+      "order": 11,
+      "target_path": "crates/edge-reconcile/src/lib.rs",
+      "page_type": "file_page",
+      "title": "lib.rs",
+      "depth": 0,
+      "kind": "code",
+      "reason": "An entry point \u2014 execution and imports fan out from here.",
+      "layer_id": "layer:application"
+    },
+    {
+      "order": 12,
+      "target_path": "config/config.example.toml",
+      "page_type": "file_page",
+      "title": "config.example.toml",
+      "depth": 1,
+      "kind": "code",
+      "reason": "The Config layer's anchor \u2014 its most depended-on file.",
+      "layer_id": "layer:config"
+    }
+  ],
+  "modules": [
+    {
+      "id": "module:config",
+      "name": "Config",
+      "path": "",
+      "layerId": "layer:config",
+      "nodeIds": [
+        "file:.github/workflows/ci.yml",
+        "file:.github/workflows/release.yml",
+        "file:config/config.example.toml"
+      ],
+      "wholeLayer": true,
+      "language": "yaml"
+    },
+    {
+      "id": "module:application",
+      "name": "Application",
+      "path": "",
+      "layerId": "layer:application",
+      "nodeIds": [
+        "file:Cargo.toml",
+        "file:README.md",
+        "file:crates/edge-agent/Cargo.toml",
+        "file:crates/edge-agent/src/api.rs",
+        "file:crates/edge-agent/src/main.rs",
+        "file:crates/edge-cli/Cargo.toml",
+        "file:crates/edge-core/Cargo.toml",
+        "file:crates/edge-core/src/errors.rs",
+        "file:crates/edge-core/src/lib.rs",
+        "file:crates/edge-core/src/mapping.rs",
+        "file:crates/edge-core/src/state.rs",
+        "file:crates/edge-core/src/validation.rs",
+        "file:crates/edge-linux/Cargo.toml",
+        "file:crates/edge-linux/src/lib.rs",
+        "file:crates/edge-nft/Cargo.toml",
+        "file:crates/edge-nft/src/apply.rs",
+        "file:crates/edge-nft/src/lib.rs",
+        "file:crates/edge-nft/src/render.rs",
+        "file:crates/edge-oci/Cargo.toml",
+        "file:crates/edge-oci/src/lib.rs",
+        "file:crates/edge-reconcile/Cargo.toml",
+        "file:crates/edge-reconcile/src/lib.rs",
+        "file:crates/edge-store/Cargo.toml",
+        "file:crates/edge-store/migrations/0001_init.sql",
+        "file:crates/edge-store/src/lib.rs",
+        "file:crates/edge-tailscale/Cargo.toml",
+        "file:crates/edge-tailscale/src/lib.rs",
+        "file:crates/edge-xdp/Cargo.toml",
+        "file:crates/edge-xdp/src/lib.rs",
+        "file:docs/ci.md",
+        "file:docs/deployment.md",
+        "file:docs/recovery.md",
+        "file:docs/xdp.md",
+        "file:scripts/install.sh",
+        "file:scripts/linux-arm64-nft-check.sh",
+        "file:scripts/linux-arm64-test.sh",
+        "file:scripts/nft-min-check.sh"
+      ],
+      "wholeLayer": true,
+      "language": "rust"
+    }
+  ]
+}

@@ -77,6 +77,9 @@ jobs:
           EDGE_NFT_USE_SUDO: "1"
         run: ./scripts/linux-arm64-nft-check.sh
 
+      - name: Installer syntax check
+        run: bash -n ./scripts/install.sh
+
       - name: XDP dry-run fails closed without explicit planning
         run: |
           tmpdir="$(mktemp -d)"
@@ -157,3 +160,5 @@ jobs:
           test -s docs/recovery.md
           test -s docs/xdp.md
           test -s config/config.example.toml
+          test -s scripts/install.sh
+          test -s systemd/edge-agent.service

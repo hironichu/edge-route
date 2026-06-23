@@ -63,6 +63,30 @@ If your tenancy policy model does not accept the granular resource types, use a 
 
 ## Install
 
+Preferred release install:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/hironichu/edge-route/release/X.X.X/scripts/install.sh \
+  | sudo env EDGE_VERSION=X.X.X bash
+```
+
+The installer detects Linux architecture, the default WAN interface, the Tailscale interface, and home CIDRs routed through Tailscale. It installs release binaries, `/etc/edge-router/config.toml`, `/etc/edge-router/edge-agent.env`, and the systemd unit. It enables `edge-agent` but does not start it unless `EDGE_START_SERVICE=1` is set.
+
+Common overrides:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/hironichu/edge-route/release/X.X.X/scripts/install.sh \
+  | sudo env \
+      EDGE_VERSION=X.X.X \
+      EDGE_WAN_INTERFACE=ens3 \
+      EDGE_TAILSCALE_INTERFACE=tailscale0 \
+      EDGE_HOME_CIDRS=10.10.40.0/24 \
+      EDGE_START_SERVICE=1 \
+      bash
+```
+
+Manual source install:
+
 ```sh
 cargo build --release -p edge-cli -p edge-agent
 sudo install -m 0755 target/release/edge /usr/local/bin/edge

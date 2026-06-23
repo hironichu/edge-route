@@ -13,7 +13,14 @@ cargo build --release -p edge-cli -p edge-agent
 CI/CD:
 
 - Pull requests and pushes run Rust formatting, clippy, tests, release builds, nft parser checks, and XDP dry-run safety checks on Linux x86_64 and arm64.
-- Tags matching `v*` build Linux x86_64 and arm64 release tarballs for `edge` and `edge-agent`.
+- Branches named `release/X.X.X` publish Linux x86_64 and arm64 release tarballs for `edge` and `edge-agent` using `X.X.X` as the release name.
+
+Install from a release branch:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/hironichu/edge-route/release/X.X.X/scripts/install.sh \
+  | sudo env EDGE_VERSION=X.X.X bash
+```
 
 Operator docs:
 
