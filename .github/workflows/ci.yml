@@ -1,0 +1,159 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - "jarvis/**"
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  rust:
+    name: rust / ${{ matrix.arch }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            runner: ubuntu-24.04
+            allow_non_arm64: "1"
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+            allow_non_arm64: "0"
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends nftables
+
+      - name: Rust toolchain
+        run: |
+          rustup toolchain install stable --profile minimal --component clippy rustfmt
+          rustup default stable
+          rustc --version
+          cargo --version
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: cargo-${{ runner.os }}-${{ matrix.arch }}-${{ hashFiles('Cargo.lock') }}
+          restore-keys: |
+            cargo-${{ runner.os }}-${{ matrix.arch }}-
+
+      - name: Format check
+        run: cargo fmt --all -- --check
+
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Unit and integration tests
+        run: cargo test --workspace --all-targets
+
+      - name: Build release binaries
+        run: cargo build --workspace --release
+
+      - name: nft minimal parser check
+        env:
+          EDGE_NFT_USE_SUDO: "1"
+        run: ./scripts/nft-min-check.sh
+
+      - name: Generated nft rules check
+        env:
+          EDGE_ALLOW_NON_ARM64: ${{ matrix.allow_non_arm64 }}
+          EDGE_NFT_USE_SUDO: "1"
+        run: ./scripts/linux-arm64-nft-check.sh
+
+      - name: XDP dry-run fails closed without explicit planning
+        run: |
+          tmpdir="$(mktemp -d)"
+          trap 'rm -rf "$tmpdir"' EXIT
+          db="$tmpdir/edge.sqlite"
+          cargo run -q -p edge-cli -- \
+            --db "$db" \
+            --home-cidr 10.10.40.0/24 \
+            map create \
+            --backend xdp \
+            --mode port_forward_snat \
+            --protocol tcp \
+            --public-ip 8.8.8.8 \
+            --edge-private-ip 10.0.0.101 \
+            --public-port 13306 \
+            --target 10.10.40.60 \
+            --target-port 3306 \
+            --name mysql-xdp \
+            --skip-route-check
+          if cargo run -q -p edge-cli -- \
+            --db "$db" \
+            --home-cidr 10.10.40.0/24 \
+            reconcile --dry-run >"$tmpdir/unexpected.out" 2>"$tmpdir/error.out"; then
+            cat "$tmpdir/unexpected.out"
+            echo "expected XDP dry-run without --enable-xdp to fail" >&2
+            exit 1
+          fi
+          grep -q "XDP mappings are present but XDP is disabled" "$tmpdir/error.out"
+
+      - name: XDP dry-run plan check
+        run: |
+          tmpdir="$(mktemp -d)"
+          trap 'rm -rf "$tmpdir"' EXIT
+          db="$tmpdir/edge.sqlite"
+          cargo run -q -p edge-cli -- \
+            --db "$db" \
+            --home-cidr 10.10.40.0/24 \
+            map create \
+            --backend xdp \
+            --mode port_forward_snat \
+            --protocol tcp \
+            --public-ip 8.8.8.8 \
+            --edge-private-ip 10.0.0.101 \
+            --public-port 13306 \
+            --target 10.10.40.60 \
+            --target-port 3306 \
+            --name mysql-xdp \
+            --skip-route-check
+          cargo run -q -p edge-cli -- \
+            --db "$db" \
+            --home-cidr 10.10.40.0/24 \
+            reconcile --dry-run --enable-xdp \
+            >"$tmpdir/nft.out" 2>"$tmpdir/xdp.out"
+          grep -q "table ip edge_nat" "$tmpdir/nft.out"
+          grep -q "XDP plan entries: 1" "$tmpdir/xdp.out"
+
+  docs:
+    name: docs and manifests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Rust toolchain
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+
+      - name: Documentation build
+        run: cargo doc --workspace --no-deps
+
+      - name: Verify important docs exist
+        run: |
+          test -s README.md
+          test -s docs/ci.md
+          test -s docs/deployment.md
+          test -s docs/recovery.md
+          test -s docs/xdp.md
+          test -s config/config.example.toml

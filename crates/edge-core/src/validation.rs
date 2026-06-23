@@ -120,8 +120,7 @@ pub fn validate_mappings(mappings: &[Mapping], config: &EdgeConfig) -> Result<()
     }
 
     for (index, mapping) in mappings.iter().enumerate() {
-        if mapping.public_ip.is_some() && mapping.mode == MappingMode::OneToOneSnat {
-            let public_ip = mapping.public_ip.unwrap();
+        if let (Some(public_ip), MappingMode::OneToOneSnat) = (mapping.public_ip, mapping.mode) {
             if !public_ips.insert(public_ip) {
                 return Err(EdgeCoreError::DuplicatePublicIp(public_ip));
             }
@@ -132,12 +131,13 @@ pub fn validate_mappings(mappings: &[Mapping], config: &EdgeConfig) -> Result<()
                 return Err(conflict_error(mapping, existing));
             }
 
-            if mapping.public_ip.is_some()
-                && mapping.public_ip == existing.public_ip
-                && (mapping.mode == MappingMode::OneToOneSnat
-                    || existing.mode == MappingMode::OneToOneSnat)
-            {
-                return Err(EdgeCoreError::DuplicatePublicIp(mapping.public_ip.unwrap()));
+            if let Some(public_ip) = mapping.public_ip {
+                if mapping.public_ip == existing.public_ip
+                    && (mapping.mode == MappingMode::OneToOneSnat
+                        || existing.mode == MappingMode::OneToOneSnat)
+                {
+                    return Err(EdgeCoreError::DuplicatePublicIp(public_ip));
+                }
             }
         }
     }

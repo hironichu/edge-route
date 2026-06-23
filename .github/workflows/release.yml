@@ -1,0 +1,109 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to create or update"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: build / ${{ matrix.arch }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            runner: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+
+      - name: Rust toolchain
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: release-cargo-${{ runner.os }}-${{ matrix.arch }}-${{ hashFiles('Cargo.lock') }}
+          restore-keys: |
+            release-cargo-${{ runner.os }}-${{ matrix.arch }}-
+
+      - name: Build release binaries
+        run: cargo build --release -p edge-cli -p edge-agent
+
+      - name: Package
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME}"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            version="${{ inputs.tag }}"
+          fi
+          package="edgeroute-${version}-linux-${{ matrix.arch }}"
+          mkdir -p "dist/$package"
+          cp target/release/edge "dist/$package/"
+          cp target/release/edge-agent "dist/$package/"
+          cp README.md "dist/$package/"
+          cp -R docs "dist/$package/docs"
+          cp -R config "dist/$package/config"
+          tar -C dist -czf "dist/${package}.tar.gz" "$package"
+          shasum -a 256 "dist/${package}.tar.gz" >"dist/${package}.tar.gz.sha256"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: edgeroute-linux-${{ matrix.arch }}
+          path: |
+            dist/*.tar.gz
+            dist/*.sha256
+          if-no-files-found: error
+
+  publish:
+    name: publish release
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME}"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            tag="${{ inputs.tag }}"
+          fi
+          gh release view "$tag" >/dev/null 2>&1 || \
+            gh release create "$tag" --title "$tag" --notes "EdgeRoute ${tag}"
+          gh release upload "$tag" dist/* --clobber

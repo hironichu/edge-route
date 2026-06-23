@@ -17,17 +17,12 @@ pub enum XdpError {
     Mapping(String, String),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum XdpAttachMode {
+    #[default]
     Skb,
     Native,
-}
-
-impl Default for XdpAttachMode {
-    fn default() -> Self {
-        Self::Skb
-    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

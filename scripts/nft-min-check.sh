@@ -14,6 +14,12 @@ skip() {
 [ "$(uname -s)" = "Linux" ] || skip "nft verification requires a Linux kernel"
 command -v nft >/dev/null 2>&1 || die "nft command not found"
 
+nft_cmd=(nft)
+if [ "${EDGE_NFT_USE_SUDO:-0}" = "1" ]; then
+    command -v sudo >/dev/null 2>&1 || die "sudo command not found"
+    nft_cmd=(sudo nft)
+fi
+
 config_file=""
 if [ -r /proc/config.gz ]; then
     config_file="/proc/config.gz"
@@ -45,6 +51,6 @@ table ip min_edge_router {
 }
 EOF
 
-nft --version
-nft -c -f "$rules"
+"${nft_cmd[@]}" --version
+"${nft_cmd[@]}" -c -f "$rules"
 echo "nft minimal parser check ok"
