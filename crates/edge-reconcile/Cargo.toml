@@ -1,0 +1,19 @@
+[package]
+name = "edge-reconcile"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+edge-core = { path = "../edge-core" }
+edge-linux = { path = "../edge-linux" }
+edge-nft = { path = "../edge-nft" }
+edge-store = { path = "../edge-store" }
+thiserror.workspace = true
+time.workspace = true
+tokio.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+tokio.workspace = true

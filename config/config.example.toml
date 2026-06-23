@@ -1,0 +1,13 @@
+wan_interface = "ens3"
+tailscale_interface = "tailscale0"
+home_cidrs = ["192.168.20.0/24"]
+
+# Required for authenticated edge-agent API.
+# Prefer EDGE_API_TOKEN in /etc/edge-router/edge-agent.env for production.
+# api_token = "replace-with-long-random-token"
+
+# Optional OCI defaults used by CLI/API provisioning.
+# oci_compartment_id = "ocid1.compartment..."
+# oci_vnic_id = "ocid1.vnic..."
+# oci_subnet_id = "ocid1.subnet..."
+# oci_nsg_ids = ["ocid1.networksecuritygroup..."]

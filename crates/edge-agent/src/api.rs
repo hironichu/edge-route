@@ -1,0 +1,349 @@
+use std::net::Ipv4Addr;
+use std::path::PathBuf;
+use std::str::FromStr;
+use std::sync::Arc;
+
+use axum::extract::{Path, State};
+use axum::http::{HeaderMap, StatusCode};
+use axum::response::{IntoResponse, Response};
+use axum::routing::{get, post};
+use axum::{Json, Router};
+use edge_core::{EdgeConfig, EdgeCoreError, Mapping, MappingId};
+use edge_nft::{render_nftables, NftRenderConfig};
+use edge_reconcile::{ReconcileOptions, Reconciler};
+use edge_store::SqliteStore;
+use edge_tailscale::TailscaleCli;
+use serde::{Deserialize, Serialize};
+
+#[derive(Clone)]
+struct AppState {
+    store: Arc<SqliteStore>,
+    config: EdgeConfig,
+}
+
+pub fn router(store: SqliteStore, config: EdgeConfig) -> Router {
+    let state = AppState {
+        store: Arc::new(store),
+        config,
+    };
+    Router::new()
+        .route("/v1/status", get(status))
+        .route("/v1/mappings", get(list_mappings).post(create_mapping))
+        .route("/v1/mappings/{id}", get(get_mapping).delete(delete_mapping))
+        .route("/v1/mappings/{id}/enable", post(enable_mapping))
+        .route("/v1/mappings/{id}/disable", post(disable_mapping))
+        .route("/v1/apply/dry-run", post(dry_run_apply))
+        .route("/v1/reconcile", post(reconcile))
+        .route("/v1/tailscale/status", get(tailscale_status))
+        .route("/v1/tailscale/routes", get(tailscale_routes))
+        .route("/v1/events", get(events))
+        .with_state(state)
+}
+
+async fn status(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+) -> Result<Json<StatusResponse>, ApiError> {
+    require_auth(&state, &headers)?;
+    let mappings = state.store.list_mappings().await?;
+    Ok(Json(StatusResponse {
+        wan_interface: state.config.wan_interface,
+        tailscale_interface: state.config.tailscale_interface,
+        mappings: mappings.len(),
+        enabled_mappings: mappings.iter().filter(|mapping| mapping.enabled).count(),
+    }))
+}
+
+async fn list_mappings(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+) -> Result<Json<Vec<Mapping>>, ApiError> {
+    require_auth(&state, &headers)?;
+    Ok(Json(state.store.list_mappings().await?))
+}
+
+async fn create_mapping(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(request): Json<CreateMappingRequest>,
+) -> Result<Json<Mapping>, ApiError> {
+    require_auth(&state, &headers)?;
+    let mut mapping = Mapping::new(
+        request.name,
+        request.public_ip,
+        request.edge_private_ip,
+        request.target_ip,
+    );
+    mapping.target_port = request.target_port;
+    state.store.insert_mapping(&mapping).await?;
+    Ok(Json(mapping))
+}
+
+async fn get_mapping(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+) -> Result<Json<Mapping>, ApiError> {
+    require_auth(&state, &headers)?;
+    let id = MappingId::from_str(&id)?;
+    Ok(Json(state.store.get_mapping(&id).await?))
+}
+
+async fn delete_mapping(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+) -> Result<Json<Mapping>, ApiError> {
+    require_auth(&state, &headers)?;
+    let id = MappingId::from_str(&id)?;
+    state.store.set_mapping_enabled(&id, false).await?;
+    let options = ReconcileOptions {
+        nft_output: PathBuf::from("/run/edge-router/generated.nft"),
+        dry_run: false,
+        apply_nft: true,
+        apply_linux: true,
+    };
+    if let Err(error) = Reconciler::default()
+        .reconcile(&state.store, &state.config, &options)
+        .await
+    {
+        state
+            .store
+            .record_event(
+                edge_core::EventLevel::Error,
+                "delete reconcile failed",
+                Some(&error.to_string()),
+            )
+            .await?;
+        return Err(ApiError::from_reconcile(error));
+    }
+    let deleted = state.store.delete_mapping(&id).await?;
+    Ok(Json(deleted))
+}
+
+async fn enable_mapping(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+) -> Result<Json<Mapping>, ApiError> {
+    require_auth(&state, &headers)?;
+    let id = MappingId::from_str(&id)?;
+    Ok(Json(state.store.set_mapping_enabled(&id, true).await?))
+}
+
+async fn disable_mapping(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+) -> Result<Json<Mapping>, ApiError> {
+    require_auth(&state, &headers)?;
+    let id = MappingId::from_str(&id)?;
+    Ok(Json(state.store.set_mapping_enabled(&id, false).await?))
+}
+
+async fn dry_run_apply(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+) -> Result<String, ApiError> {
+    require_auth(&state, &headers)?;
+    let mappings = state.store.list_mappings().await?;
+    Ok(render_nftables(
+        &mappings,
+        &state.config,
+        &NftRenderConfig::default(),
+    )?)
+}
+
+async fn reconcile(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(request): Json<ReconcileRequest>,
+) -> Result<Json<ReconcileResponse>, ApiError> {
+    require_auth(&state, &headers)?;
+    let options = ReconcileOptions {
+        nft_output: request
+            .output
+            .unwrap_or_else(|| PathBuf::from("/run/edge-router/generated.nft")),
+        dry_run: request.dry_run,
+        apply_nft: !request.skip_nft,
+        apply_linux: !request.skip_linux,
+    };
+    let report = Reconciler::default()
+        .reconcile(&state.store, &state.config, &options)
+        .await
+        .map_err(ApiError::from_reconcile)?;
+    Ok(Json(ReconcileResponse {
+        generation_id: report.generation_id,
+        added_addresses: report.added_addresses,
+        removed_addresses: report.removed_addresses,
+        nftables_config: if request.include_config {
+            Some(report.nftables_config)
+        } else {
+            None
+        },
+    }))
+}
+
+async fn tailscale_status(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+) -> Result<Json<edge_tailscale::TailscaleStatus>, ApiError> {
+    require_auth(&state, &headers)?;
+    Ok(Json(
+        TailscaleCli::default()
+            .status()
+            .await
+            .map_err(ApiError::bad_gateway)?,
+    ))
+}
+
+async fn tailscale_routes(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+) -> Result<Json<Vec<String>>, ApiError> {
+    require_auth(&state, &headers)?;
+    let status = TailscaleCli::default()
+        .status()
+        .await
+        .map_err(ApiError::bad_gateway)?;
+    Ok(Json(status.advertised_routes()))
+}
+
+async fn events(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+) -> Result<Json<Vec<edge_core::Event>>, ApiError> {
+    require_auth(&state, &headers)?;
+    Ok(Json(state.store.list_events(100).await?))
+}
+
+#[derive(Debug, Serialize)]
+struct StatusResponse {
+    wan_interface: String,
+    tailscale_interface: String,
+    mappings: usize,
+    enabled_mappings: usize,
+}
+
+#[derive(Debug, Deserialize)]
+struct CreateMappingRequest {
+    name: String,
+    public_ip: Option<Ipv4Addr>,
+    edge_private_ip: Ipv4Addr,
+    target_ip: Ipv4Addr,
+    target_port: Option<u16>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ReconcileRequest {
+    #[serde(default)]
+    dry_run: bool,
+    #[serde(default)]
+    skip_linux: bool,
+    #[serde(default)]
+    skip_nft: bool,
+    #[serde(default)]
+    include_config: bool,
+    output: Option<PathBuf>,
+}
+
+#[derive(Debug, Serialize)]
+struct ReconcileResponse {
+    generation_id: Option<i64>,
+    added_addresses: Vec<String>,
+    removed_addresses: Vec<String>,
+    nftables_config: Option<String>,
+}
+
+struct ApiError {
+    status: StatusCode,
+    message: String,
+}
+
+impl From<EdgeCoreError> for ApiError {
+    fn from(error: EdgeCoreError) -> Self {
+        let status = match error {
+            EdgeCoreError::NotFound(_) => StatusCode::NOT_FOUND,
+            EdgeCoreError::Validation(_)
+            | EdgeCoreError::DuplicatePublicIp(_)
+            | EdgeCoreError::DuplicateEdgePrivateIp(_)
+            | EdgeCoreError::DuplicateTargetIp(_)
+            | EdgeCoreError::DuplicateMappingId(_) => StatusCode::BAD_REQUEST,
+            EdgeCoreError::Store(_) => StatusCode::INTERNAL_SERVER_ERROR,
+        };
+        Self {
+            status,
+            message: error.to_string(),
+        }
+    }
+}
+
+impl IntoResponse for ApiError {
+    fn into_response(self) -> Response {
+        (self.status, self.message).into_response()
+    }
+}
+
+impl ApiError {
+    fn unauthorized() -> Self {
+        Self {
+            status: StatusCode::UNAUTHORIZED,
+            message: "missing or invalid bearer token".to_owned(),
+        }
+    }
+
+    fn bad_gateway(error: impl std::fmt::Display) -> Self {
+        Self {
+            status: StatusCode::BAD_GATEWAY,
+            message: error.to_string(),
+        }
+    }
+
+    fn from_reconcile(error: edge_reconcile::ReconcileError) -> Self {
+        Self {
+            status: StatusCode::INTERNAL_SERVER_ERROR,
+            message: error.to_string(),
+        }
+    }
+}
+
+fn require_auth(state: &AppState, headers: &HeaderMap) -> Result<(), ApiError> {
+    let Some(expected) = state.config.api_token.as_deref() else {
+        return Ok(());
+    };
+    let Some(actual) = headers
+        .get(axum::http::header::AUTHORIZATION)
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| value.strip_prefix("Bearer "))
+    else {
+        return Err(ApiError::unauthorized());
+    };
+    if constant_time_eq(actual.as_bytes(), expected.as_bytes()) {
+        Ok(())
+    } else {
+        Err(ApiError::unauthorized())
+    }
+}
+
+fn constant_time_eq(left: &[u8], right: &[u8]) -> bool {
+    let max = left.len().max(right.len());
+    let mut diff = left.len() ^ right.len();
+    for idx in 0..max {
+        let a = left.get(idx).copied().unwrap_or(0);
+        let b = right.get(idx).copied().unwrap_or(0);
+        diff |= (a ^ b) as usize;
+    }
+    diff == 0
+}
+
+#[cfg(test)]
+mod tests {
+    use super::constant_time_eq;
+
+    #[test]
+    fn compares_tokens_constant_time_style() {
+        assert!(constant_time_eq(b"secret", b"secret"));
+        assert!(!constant_time_eq(b"secret", b"secrex"));
+        assert!(!constant_time_eq(b"secret", b"secret2"));
+    }
+}

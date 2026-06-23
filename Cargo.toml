@@ -1,0 +1,36 @@
+[workspace]
+members = [
+    "crates/edge-agent",
+    "crates/edge-cli",
+    "crates/edge-core",
+    "crates/edge-linux",
+    "crates/edge-nft",
+    "crates/edge-oci",
+    "crates/edge-reconcile",
+    "crates/edge-store",
+    "crates/edge-tailscale",
+]
+resolver = "2"
+
+[workspace.package]
+edition = "2021"
+license = "MIT"
+
+[workspace.dependencies]
+anyhow = "1.0.100"
+axum = "0.8.4"
+clap = { version = "4.5.48", features = ["derive", "env"] }
+ipnet = { version = "2.11.0", features = ["serde"] }
+serde = { version = "1.0.203", features = ["derive"] }
+serde_json = "1.0.117"
+sqlx = { version = "0.8.6", default-features = false, features = ["macros", "migrate", "runtime-tokio-rustls", "sqlite", "time"] }
+tempfile = "3.23.0"
+thiserror = "1.0.61"
+time = { version = "0.3.36", features = ["formatting", "parsing", "serde"] }
+toml = "0.9.8"
+tokio = { version = "1.47.1", features = ["macros", "net", "process", "rt-multi-thread", "signal", "time"] }
+tower = "0.5.2"
+tower-http = { version = "0.6.6", features = ["trace"] }
+tracing = "0.1.41"
+tracing-subscriber = { version = "0.3.20", features = ["env-filter"] }
+uuid = { version = "1.8.0", features = ["v4", "serde"] }

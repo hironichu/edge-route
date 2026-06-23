@@ -1,0 +1,27 @@
+[Unit]
+Description=Edge Router Agent
+After=network-online.target tailscaled.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+EnvironmentFile=-/etc/edge-router/edge-agent.env
+ExecStart=/usr/local/bin/edge-agent --config /etc/edge-router/config.toml --db /var/lib/edge-router/state.sqlite --unix-socket /run/edge-router/edge-agent.sock
+Restart=always
+RestartSec=3
+User=root
+Group=root
+StateDirectory=edge-router
+RuntimeDirectory=edge-router
+CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_RAW CAP_NET_BIND_SERVICE
+AmbientCapabilities=CAP_NET_ADMIN CAP_NET_RAW CAP_NET_BIND_SERVICE
+NoNewPrivileges=false
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/edge-router /run/edge-router
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX AF_NETLINK
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target
