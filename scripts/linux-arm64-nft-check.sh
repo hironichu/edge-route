@@ -57,7 +57,8 @@ cargo run -q --manifest-path "$repo_root/Cargo.toml" -p edge-cli -- \
     map create \
     --edge-private-ip "${EDGE_EDGE_PRIVATE_IP:-10.0.0.101}" \
     --target "${EDGE_TARGET_IP:-192.168.20.42}" \
-    --name "${EDGE_MAP_NAME:-prod-vm-1}" >"$tmpdir/create.out"
+    --name "${EDGE_MAP_NAME:-prod-vm-1}" \
+    --skip-route-check >"$tmpdir/create.out"
 cargo run -q --manifest-path "$repo_root/Cargo.toml" -p edge-cli -- \
     --db "$tmpdb" \
     --home-cidr "${EDGE_HOME_CIDR:-192.168.20.0/24}" \
