@@ -4,6 +4,7 @@ use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tokio::process::Command;
+use tokio::time::{timeout, Duration};
 
 pub type Result<T> = std::result::Result<T, OciError>;
 
@@ -15,6 +16,8 @@ pub enum OciError {
     Json(#[from] serde_json::Error),
     #[error("OCI CLI process failed: {0}")]
     Io(#[from] std::io::Error),
+    #[error("OCI CLI timed out after {0}s")]
+    Timeout(u64),
     #[error("OCI API config failed: {0}")]
     Config(String),
 }
@@ -315,6 +318,10 @@ impl OciCli {
         parse_list(&output.stdout)
     }
 
+    pub async fn version(&self) -> Result<CommandOutput> {
+        self.run(["--version"]).await
+    }
+
     pub async fn create_private_ip(
         &self,
         vnic_id: &str,
@@ -405,7 +412,13 @@ impl OciCli {
     }
 
     async fn run_owned(&self, args: Vec<String>) -> Result<CommandOutput> {
-        let output = Command::new(&self.binary).args(args).output().await?;
+        let timeout_seconds = 12;
+        let output = timeout(
+            Duration::from_secs(timeout_seconds),
+            Command::new(&self.binary).args(args).output(),
+        )
+        .await
+        .map_err(|_| OciError::Timeout(timeout_seconds))??;
         let result = CommandOutput {
             status: output.status.code(),
             stdout: String::from_utf8_lossy(&output.stdout).into_owned(),

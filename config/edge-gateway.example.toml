@@ -1,0 +1,8 @@
+# Optional token for raw /api/* proxy access.
+# Server-rendered /ui/* pages rely on Tailscale ACL/grants instead.
+# gateway_token = "replace-with-long-random-gateway-token"
+
+# Token used only by edge-gateway when proxying to edge-agent.
+# This must match edge-agent's EDGE_API_TOKEN/config api_token.
+# Prefer EDGE_API_TOKEN in /etc/edge-router/edge-gateway.env for production.
+api_token = "replace-with-edge-agent-api-token"

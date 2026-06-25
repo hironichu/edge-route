@@ -1,0 +1,25 @@
+[Unit]
+Description=Edge Router Gateway
+After=network-online.target edge-agent.service
+Wants=network-online.target
+Requires=edge-agent.service
+
+[Service]
+Type=simple
+EnvironmentFile=-/etc/edge-router/edge-gateway.env
+ExecStart=/usr/local/bin/edge-gateway
+Restart=always
+RestartSec=3
+User=edge-gateway
+Group=edge-router
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+SystemCallArchitectures=native
+CapabilityBoundingSet=
+AmbientCapabilities=
+
+[Install]
+WantedBy=multi-user.target

@@ -3,6 +3,7 @@ members = [
     "crates/edge-agent",
     "crates/edge-cli",
     "crates/edge-core",
+    "crates/edge-gateway",
     "crates/edge-linux",
     "crates/edge-nft",
     "crates/edge-oci",
@@ -20,8 +21,13 @@ license = "MIT"
 [workspace.dependencies]
 anyhow = "1.0.100"
 axum = "0.8.4"
+bytes = "1.12.0"
 clap = { version = "4.5.48", features = ["derive", "env"] }
+http-body-util = "0.1.3"
+hyper = { version = "1.10.1", features = ["client", "http1"] }
+hyper-util = { version = "0.1.20", features = ["client-legacy", "http1", "tokio"] }
 ipnet = { version = "2.11.0", features = ["serde"] }
+maud = "0.27"
 serde = { version = "1.0.203", features = ["derive"] }
 serde_json = "1.0.117"
 sqlx = { version = "0.8.6", default-features = false, features = ["macros", "migrate", "runtime-tokio-rustls", "sqlite", "time"] }
@@ -31,7 +37,8 @@ time = { version = "0.3.36", features = ["formatting", "parsing", "serde"] }
 toml = "0.9.8"
 tokio = { version = "1.47.1", features = ["macros", "net", "process", "rt-multi-thread", "signal", "time"] }
 tower = "0.5.2"
-tower-http = { version = "0.6.6", features = ["trace"] }
+tower-http = { version = "0.6.6", features = ["fs", "trace"] }
+tower-service = "0.3.3"
 tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.20", features = ["env-filter"] }
 uuid = { version = "1.8.0", features = ["v4", "serde"] }
