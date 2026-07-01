@@ -1,7 +1,7 @@
 [Unit]
 Description=Edge Router Agent
-After=network-online.target tailscaled.service
-Wants=network-online.target
+After=network-online.target netbird.service
+Wants=network-online.target netbird.service
 
 [Service]
 Type=simple

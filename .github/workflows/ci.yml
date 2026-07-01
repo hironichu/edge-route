@@ -87,7 +87,7 @@ jobs:
           db="$tmpdir/edge.sqlite"
           cargo run -q -p edge-cli -- \
             --db "$db" \
-            --home-cidr 10.10.40.0/24 \
+            --target-cidr 10.10.40.0/24 \
             map create \
             --backend xdp \
             --mode port_forward_snat \
@@ -101,7 +101,7 @@ jobs:
             --skip-route-check
           if cargo run -q -p edge-cli -- \
             --db "$db" \
-            --home-cidr 10.10.40.0/24 \
+            --target-cidr 10.10.40.0/24 \
             reconcile --dry-run >"$tmpdir/unexpected.out" 2>"$tmpdir/error.out"; then
             cat "$tmpdir/unexpected.out"
             echo "expected XDP dry-run without --enable-xdp to fail" >&2
@@ -116,7 +116,7 @@ jobs:
           db="$tmpdir/edge.sqlite"
           cargo run -q -p edge-cli -- \
             --db "$db" \
-            --home-cidr 10.10.40.0/24 \
+            --target-cidr 10.10.40.0/24 \
             map create \
             --backend xdp \
             --mode port_forward_snat \
@@ -130,7 +130,7 @@ jobs:
             --skip-route-check
           cargo run -q -p edge-cli -- \
             --db "$db" \
-            --home-cidr 10.10.40.0/24 \
+            --target-cidr 10.10.40.0/24 \
             reconcile --dry-run --enable-xdp \
             >"$tmpdir/nft.out" 2>"$tmpdir/xdp.out"
           grep -q "table ip edge_nat" "$tmpdir/nft.out"

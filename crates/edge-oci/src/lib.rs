@@ -406,6 +406,65 @@ impl OciCli {
         Ok(vnic)
     }
 
+    /// Provision an OCI private IP on the forwarding VNIC and a reserved public IP
+    /// bound to it, rolling back the private IP if the public IP step fails.
+    pub async fn allocate_forwarding_ip(
+        &self,
+        compartment_id: &str,
+        vnic_id: &str,
+        display_name: Option<&str>,
+    ) -> Result<Allocation> {
+        self.validate_forwarding_vnic(vnic_id).await?;
+        let private_ip = self.create_private_ip(vnic_id, display_name).await?;
+        let public_ip = match self
+            .create_reserved_public_ip(compartment_id, &private_ip.id, display_name)
+            .await
+        {
+            Ok(public_ip) => public_ip,
+            Err(error) => {
+                let _ = self.delete_private_ip(&private_ip.id).await;
+                return Err(error);
+            }
+        };
+        Ok(Allocation {
+            private_ip,
+            public_ip,
+        })
+    }
+
+    pub async fn add_nsg_rules(&self, nsg_id: &str, rules: &[IngressSecurityRule]) -> Result<()> {
+        let cli_rules: Vec<NsgRuleCli> = rules.iter().map(NsgRuleCli::ingress).collect();
+        let json = serde_json::to_string(&cli_rules)?;
+        self.run_owned(vec![
+            "network".to_owned(),
+            "nsg".to_owned(),
+            "rules".to_owned(),
+            "add".to_owned(),
+            "--nsg-id".to_owned(),
+            nsg_id.to_owned(),
+            "--security-rules".to_owned(),
+            json,
+        ])
+        .await?;
+        Ok(())
+    }
+
+    pub async fn remove_nsg_rules(&self, nsg_id: &str, rule_ids: &[String]) -> Result<()> {
+        let json = serde_json::to_string(rule_ids)?;
+        self.run_owned(vec![
+            "network".to_owned(),
+            "nsg".to_owned(),
+            "rules".to_owned(),
+            "remove".to_owned(),
+            "--nsg-id".to_owned(),
+            nsg_id.to_owned(),
+            "--security-rule-ids".to_owned(),
+            json,
+        ])
+        .await?;
+        Ok(())
+    }
+
     async fn run<const N: usize>(&self, args: [&str; N]) -> Result<CommandOutput> {
         self.run_owned(args.into_iter().map(str::to_owned).collect())
             .await
@@ -453,7 +512,49 @@ impl CommandOutput {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+/// Result of [`OciCli::allocate_forwarding_ip`]: a freshly created private IP and
+/// the reserved public IP bound to it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Allocation {
+    pub private_ip: PrivateIp,
+    pub public_ip: PublicIp,
+}
+
+/// NSG security rule as the `oci network nsg rules add` CLI expects it. The public
+/// [`IngressSecurityRule`] omits `direction`/`sourceType`/`isStateless`, which the
+/// CLI requires, so this adds them.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct NsgRuleCli {
+    direction: &'static str,
+    protocol: String,
+    source: String,
+    source_type: &'static str,
+    is_stateless: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    tcp_options: Option<PortOptions>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    udp_options: Option<PortOptions>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    description: Option<String>,
+}
+
+impl NsgRuleCli {
+    fn ingress(rule: &IngressSecurityRule) -> Self {
+        Self {
+            direction: "INGRESS",
+            protocol: rule.protocol.clone(),
+            source: rule.source.clone(),
+            source_type: "CIDR_BLOCK",
+            is_stateless: false,
+            tcp_options: rule.tcp_options.clone(),
+            udp_options: rule.udp_options.clone(),
+            description: rule.description.clone(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PublicIp {
     pub id: String,
     #[serde(rename = "ip-address")]
@@ -468,7 +569,7 @@ pub struct PublicIp {
     pub display_name: Option<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PrivateIp {
     pub id: String,
     #[serde(rename = "ip-address")]

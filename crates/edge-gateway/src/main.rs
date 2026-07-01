@@ -120,7 +120,7 @@ async fn main() -> Result<()> {
         .route("/topology", get(index))
         .route("/oracle", get(index))
         .route("/reconcile", get(index))
-        .route("/tailscale", get(index))
+        .route("/netbird", get(index))
         .route("/logs", get(index))
         .route("/healthz", get(health))
         .route("/status", get(status))
@@ -140,7 +140,13 @@ async fn main() -> Result<()> {
         .route("/ui/tools/reconcile-check", post(ui::tools_reconcile_check))
         .route("/ui/topology", get(ui::topology))
         .route("/ui/oracle", get(ui::oracle))
-        .route("/ui/tailscale", get(ui::tailscale))
+        .route("/ui/oracle/allocate", post(ui::oracle_allocate))
+        .route("/ui/oracle/release", post(ui::oracle_release))
+        .route("/ui/oracle/vnic-check", post(ui::oracle_vnic_check))
+        .route("/ui/oracle/public-ips", post(ui::oracle_public_ips))
+        .route("/ui/oracle/nsg/add", post(ui::oracle_nsg_add))
+        .route("/ui/oracle/nsg/remove", post(ui::oracle_nsg_remove))
+        .route("/ui/netbird", get(ui::netbird))
         .route("/ui/events", get(ui::events))
         .route("/ui/logs", get(ui::events))
         .route("/ui/logs/download", get(ui::download_logs))
@@ -214,7 +220,7 @@ async fn status(State(state): State<AppState>) -> Json<GatewayStatus> {
         api_auth: if state.gateway_token.is_some() {
             "bearer"
         } else {
-            "tailnet"
+            "netbird"
         },
     })
 }

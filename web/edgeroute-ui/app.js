@@ -5,7 +5,7 @@ const commands = [
   ["Topology", "/ui/topology", "/topology"],
   ["Oracle", "/ui/oracle", "/oracle"],
   ["Reconcile", "/ui/reconcile", "/reconcile"],
-  ["Tailscale", "/ui/tailscale", "/tailscale"],
+  ["NetBird", "/ui/netbird", "/netbird"],
   ["Logs", "/ui/logs", "/logs"],
 ];
 
@@ -151,6 +151,21 @@ document.body.addEventListener("change", (event) => {
     });
   }
   if (event.target.matches("[data-select-all], [data-row-select]")) updateSelectionState();
+});
+
+// Typed-confirmation gate: a form's submit button stays disabled until the
+// matching [data-confirm-input] value equals its data-confirm-word. The agent
+// re-checks this server-side, so this is UX, not the security boundary.
+document.body.addEventListener("input", (event) => {
+  const field = event.target.closest("[data-confirm-input]");
+  if (!field) return;
+  const form = field.closest("form");
+  if (!form) return;
+  const word = (field.dataset.confirmWord || "").trim().toLowerCase();
+  const ok = field.value.trim().toLowerCase() === word && word.length > 0;
+  form.querySelectorAll("[data-confirm-submit]").forEach((btn) => {
+    btn.disabled = !ok;
+  });
 });
 
 document.body.addEventListener("htmx:afterSwap", (event) => {

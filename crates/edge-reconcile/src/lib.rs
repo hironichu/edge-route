@@ -357,7 +357,7 @@ mod tests {
         let store = SqliteStore::connect(dir.path().join("state.sqlite"))
             .await
             .unwrap();
-        let config = EdgeConfig::new("ens3", "tailscale0", vec!["10.10.40.0/24".parse().unwrap()]);
+        let config = EdgeConfig::new("ens3", "wt0", vec!["10.10.40.0/24".parse().unwrap()]);
         store.set_edge_config(&config).await.unwrap();
         store.insert_mapping(&xdp_mapping()).await.unwrap();
         let options = ReconcileOptions {
@@ -381,7 +381,7 @@ mod tests {
         let store = SqliteStore::connect(dir.path().join("state.sqlite"))
             .await
             .unwrap();
-        let config = EdgeConfig::new("ens3", "tailscale0", vec!["10.10.40.0/24".parse().unwrap()]);
+        let config = EdgeConfig::new("ens3", "wt0", vec!["10.10.40.0/24".parse().unwrap()]);
         store.set_edge_config(&config).await.unwrap();
         store.insert_mapping(&xdp_mapping()).await.unwrap();
         let options = ReconcileOptions {

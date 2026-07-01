@@ -6,7 +6,7 @@ use bytes::Bytes;
 use edge_core::{
     Event, EventLevel, Mapping, MappingBackend, MappingId, MappingMode, MappingStatus, Protocol,
 };
-use edge_tailscale::{Node, TailscaleStatus};
+use edge_netbird::{NetbirdStatus, Peer, PeerOverview, ServiceStatus};
 use serde::Deserialize;
 use serde_json::json;
 use time::{Duration, OffsetDateTime};
@@ -58,7 +58,8 @@ pub async fn handle(
     let response = match (method.clone(), path) {
         (Method::GET, "/v1/status") => json!({
             "wan_interface": "ens3",
-            "tailscale_interface": "tailscale0",
+            "netbird_interface": "wt0",
+            "target_cidrs": ["10.10.30.0/24", "10.10.40.0/24", "10.10.50.0/24"],
             "mappings": store.mappings.len(),
             "enabled_mappings": store.mappings.iter().filter(|m| m.enabled).count(),
         }),
@@ -93,10 +94,10 @@ pub async fn handle(
             "xdp_plan_entries": 0,
             "nftables_config": nft_text(),
         }),
-        (Method::GET, "/v1/tailscale/status") => {
-            serde_json::to_value(tailscale_status()).map_err(GatewayError::bad_gateway)?
+        (Method::GET, "/v1/netbird/status") => {
+            serde_json::to_value(netbird_status()).map_err(GatewayError::bad_gateway)?
         }
-        (Method::GET, "/v1/tailscale/routes") => json!(["192.168.20.0/24"]),
+        (Method::GET, "/v1/netbird/networks") => json!(["10.10.40.0/24"]),
         (Method::GET, "/v1/events") => {
             serde_json::to_value(&store.events).map_err(GatewayError::bad_gateway)?
         }
@@ -113,8 +114,8 @@ pub async fn handle(
         }),
         (Method::GET, "/v1/topology") => json!({
             "wan_interface": "ens3",
-            "tailscale_interface": "tailscale0",
-            "home_cidrs": ["192.168.20.0/24"],
+            "netbird_interface": "wt0",
+            "target_cidrs": ["10.10.40.0/24"],
             "flows": store.mappings.iter().map(|mapping| json!({
                 "id": mapping.id.to_string(),
                 "name": mapping.name,
@@ -131,10 +132,10 @@ pub async fn handle(
         (Method::GET, "/v1/oci/status") => json!({
             "auth_mode": "instance_principal",
             "region": "eu-paris-1",
-            "compartment_id_configured": false,
-            "vnic_id_configured": false,
-            "subnet_id_configured": false,
-            "nsg_count": 0,
+            "compartment_id_configured": true,
+            "vnic_id_configured": true,
+            "subnet_id_configured": true,
+            "nsg_count": 1,
             "api_key_env_ready": false,
             "env": {
                 "tenancy_id": false,
@@ -143,8 +144,33 @@ pub async fn handle(
                 "private_key_path": false
             },
             "cli_available": true,
-            "cli_version": "oci-cli fixture"
+            "cli_version": "oci-cli fixture",
+            "compartment_id": "ocid1.compartment.oc1..fixture",
+            "vnic_id": "ocid1.vnic.oc1..fixture",
+            "subnet_id": "ocid1.subnet.oc1..fixture",
+            "nsg_ids": ["ocid1.networksecuritygroup.oc1..fixture"]
         }),
+        (Method::POST, "/v1/oci/allocate") => json!({
+            "id": "fixture", "name": "fixture",
+            "public_ip": "152.0.0.10", "edge_private_ip": "10.0.0.101",
+            "oci_public_ip_ocid": "ocid1.publicip.oc1..fixture",
+            "oci_private_ip_ocid": "ocid1.privateip.oc1..fixture",
+            "note": "mock allocate; no OCI call made"
+        }),
+        (Method::POST, "/v1/oci/release") => json!({
+            "released": true, "note": "mock release; no OCI call made"
+        }),
+        (Method::GET, "/v1/oci/vnic/check") => json!({
+            "id": "ocid1.vnic.oc1..fixture", "display_name": "edge",
+            "skip_source_dest_check": true, "ok": true
+        }),
+        (Method::GET, "/v1/oci/public-ips") => json!([
+            {"id":"ocid1.publicip.oc1..fixture","ip-address":"152.0.0.10",
+             "private-ip-id":"ocid1.privateip.oc1..fixture","lifetime":"RESERVED",
+             "scope":"REGION","lifecycle-state":"AVAILABLE","display-name":"fixture"}
+        ]),
+        (Method::POST, "/v1/oci/nsg/add") => json!({ "added": true, "nsg_id": "fixture" }),
+        (Method::POST, "/v1/oci/nsg/remove") => json!({ "removed": 1, "nsg_id": "fixture" }),
         _ => {
             if let Some((mapping_id, action)) = mapping_action(path) {
                 return handle_mapping_action(&mut store, method, mapping_id, action);
@@ -321,26 +347,41 @@ fn sample_event(id: i64, level: EventLevel, message: &str, data: Option<&str>) -
     }
 }
 
-fn tailscale_status() -> TailscaleStatus {
-    let mut peers = std::collections::BTreeMap::new();
-    peers.insert(
-        "nodekey:home".to_owned(),
-        Node {
-            host_name: Some("home-router".to_owned()),
-            tailscale_ips: vec!["100.92.14.8".to_owned()],
-            allowed_ips: vec!["100.92.14.8/32".to_owned(), "192.168.20.0/24".to_owned()],
-            online: Some(true),
+fn netbird_status() -> NetbirdStatus {
+    NetbirdStatus {
+        peers: PeerOverview {
+            total: 2,
+            connected: 1,
+            details: vec![
+                Peer {
+                    fqdn: Some("netbird-routing.bird.home".to_owned()),
+                    netbird_ip: Some("100.64.94.84".to_owned()),
+                    netbird_ipv6: Some("fd66:a144::2".to_owned()),
+                    status: Some("Connected".to_owned()),
+                    connection_type: Some("Relayed".to_owned()),
+                    networks: vec!["10.10.40.0/24".to_owned()],
+                },
+                Peer {
+                    fqdn: Some("idle.bird.home".to_owned()),
+                    netbird_ip: Some("100.64.34.182".to_owned()),
+                    netbird_ipv6: Some("fd66:a144::3".to_owned()),
+                    status: Some("Idle".to_owned()),
+                    connection_type: Some("-".to_owned()),
+                    networks: Vec::new(),
+                },
+            ],
         },
-    );
-    TailscaleStatus {
-        backend_state: Some("Running".to_owned()),
-        self_node: Some(Node {
-            host_name: Some("edge".to_owned()),
-            tailscale_ips: vec!["100.92.14.4".to_owned()],
-            allowed_ips: vec!["100.92.14.4/32".to_owned()],
-            online: Some(true),
-        }),
-        peers,
+        cli_version: Some("0.73.2".to_owned()),
+        daemon_version: Some("0.73.2".to_owned()),
+        daemon_status: Some("Connected".to_owned()),
+        management: ServiceStatus { connected: true },
+        signal: ServiceStatus { connected: true },
+        netbird_ip: Some("100.64.65.67/16".to_owned()),
+        netbird_ipv6: Some("fd66:a144::1/64".to_owned()),
+        uses_kernel_interface: Some(true),
+        fqdn: Some("mainvnic.bird.home".to_owned()),
+        networks: Vec::new(),
+        lazy_connection_enabled: true,
     }
 }
 

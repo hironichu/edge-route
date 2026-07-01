@@ -1,14 +1,14 @@
 # Web GUI
 
-EdgeRoute GUI is served by `edge-gateway`. It is not mixed into `edge-agent`: privileged nft/Linux/Tailscale work remains in `edge-agent`, while `edge-gateway` renders management screens and talks to `edge-agent` over the Unix socket.
+EdgeRoute GUI is served by `edge-gateway`. It is not mixed into `edge-agent`: privileged nft/Linux/NetBird work remains in `edge-agent`, while `edge-gateway` renders management screens and talks to `edge-agent` over the Unix socket.
 
 ## Runtime Shape
 
 ```txt
-tailnet browser -> edge-gateway HTTP :8080 -> /run/edge-router/edge-agent.sock -> edge-agent
+netbird browser -> edge-gateway HTTP :8080 -> /run/edge-router/edge-agent.sock -> edge-agent
 ```
 
-Transport security and access control are expected from Tailscale. Bind `edge-gateway` to loopback for local use, or to the node's Tailscale IP for remote operators. Do not bind to `0.0.0.0`; the binary refuses wildcard binds.
+Transport security and access control are expected from NetBird. Bind `edge-gateway` to loopback for local use, or to the node's NetBird IP for remote operators. Before binding remotely, create a narrow NetBird TCP policy from the operator group to the gateway port. Do not bind to `0.0.0.0`; the binary refuses wildcard binds.
 
 The UI uses:
 
@@ -26,23 +26,13 @@ Every UI value is rendered from the real `edge-agent` API:
 - `DELETE /v1/mappings/{id}`
 - `POST /v1/apply/dry-run`
 - `POST /v1/reconcile`
-- `GET /v1/tailscale/status`
-- `GET /v1/tailscale/routes`
+- `GET /v1/netbird/status`
+- `GET /v1/netbird/networks`
 - `GET /v1/events`
 
-## Tailscale Grant
+## NetBird Policy
 
-Example grant shape restricting access to tagged edge gateway nodes:
-
-```json
-{
-  "src": ["group:ops"],
-  "dst": ["tag:edge-gateway"],
-  "ip": ["tcp:8080"]
-}
-```
-
-Set `EDGE_GATEWAY_BIND` to the Tailscale IP and port allowed by your ACL/grant.
+Create an `edgeroute-operators` source group and a unidirectional peer policy to the edge gateway on TCP/8080. Ensure no broader policy also exposes that port. Set `EDGE_GATEWAY_BIND` to the NetBird IP and policy port.
 
 ## Install UI Assets
 
@@ -72,7 +62,7 @@ EDGE_API_TOKEN=replace-with-edge-agent-api-token
 EOF
 ```
 
-`EDGE_GATEWAY_TOKEN` is optional. If set, it gates raw `/api/*` JSON proxy requests. The server-rendered `/ui/*` pages rely on Tailscale grants instead.
+`EDGE_GATEWAY_TOKEN` is optional. If set, it gates raw `/api/*` JSON proxy requests. The server-rendered `/ui/*` pages rely on the NetBird peer policy instead.
 
 ## System Users
 

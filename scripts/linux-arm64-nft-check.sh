@@ -53,7 +53,7 @@ generated="$tmpdir/edge-router-generated.nft"
 
 cargo run -q --manifest-path "$repo_root/Cargo.toml" -p edge-cli -- \
     --db "$tmpdb" \
-    --home-cidr "${EDGE_HOME_CIDR:-192.168.20.0/24}" \
+    --target-cidr "${EDGE_TARGET_CIDR:-192.168.20.0/24}" \
     map create \
     --edge-private-ip "${EDGE_EDGE_PRIVATE_IP:-10.0.0.101}" \
     --target "${EDGE_TARGET_IP:-192.168.20.42}" \
@@ -61,7 +61,7 @@ cargo run -q --manifest-path "$repo_root/Cargo.toml" -p edge-cli -- \
     --skip-route-check >"$tmpdir/create.out"
 cargo run -q --manifest-path "$repo_root/Cargo.toml" -p edge-cli -- \
     --db "$tmpdb" \
-    --home-cidr "${EDGE_HOME_CIDR:-192.168.20.0/24}" \
+    --target-cidr "${EDGE_TARGET_CIDR:-192.168.20.0/24}" \
     apply --dry-run >"$generated"
 
 "${nft_cmd[@]}" --version

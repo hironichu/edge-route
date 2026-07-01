@@ -8,18 +8,18 @@ use crate::mapping::{EdgeConfig, Mapping, MappingBackend, MappingMode, Protocol}
 
 pub fn validate_edge_config(config: &EdgeConfig) -> Result<()> {
     validate_interface_name("wan_interface", &config.wan_interface)?;
-    validate_interface_name("tailscale_interface", &config.tailscale_interface)?;
+    validate_interface_name("netbird_interface", &config.netbird_interface)?;
 
-    if config.home_cidrs.is_empty() {
+    if config.target_cidrs.is_empty() {
         return Err(EdgeCoreError::validation(
-            "at least one home CIDR must be configured",
+            "at least one target CIDR must be configured",
         ));
     }
 
-    for cidr in &config.home_cidrs {
+    for cidr in &config.target_cidrs {
         if cidr.addr().is_unspecified() {
             return Err(EdgeCoreError::validation(format!(
-                "home CIDR cannot be unspecified: {cidr}"
+                "target CIDR cannot be unspecified: {cidr}"
             )));
         }
     }
@@ -33,7 +33,7 @@ pub fn validate_mapping(mapping: &Mapping, config: &EdgeConfig) -> Result<()> {
         validate_public_ip(public_ip)?;
     }
     validate_edge_private_ip(mapping.edge_private_ip)?;
-    validate_target_ip(mapping.target_ip, &config.home_cidrs)?;
+    validate_target_ip(mapping.target_ip, &config.target_cidrs)?;
 
     if mapping.public_ip == Some(mapping.edge_private_ip) {
         return Err(EdgeCoreError::validation(
@@ -248,10 +248,10 @@ fn validate_edge_private_ip(ip: Ipv4Addr) -> Result<()> {
     Ok(())
 }
 
-fn validate_target_ip(ip: Ipv4Addr, home_cidrs: &[Ipv4Net]) -> Result<()> {
-    let Some(cidr) = home_cidrs.iter().find(|cidr| cidr.contains(&ip)) else {
+fn validate_target_ip(ip: Ipv4Addr, target_cidrs: &[Ipv4Net]) -> Result<()> {
+    let Some(cidr) = target_cidrs.iter().find(|cidr| cidr.contains(&ip)) else {
         return Err(EdgeCoreError::validation(format!(
-            "target IP is outside configured home CIDRs: {ip}"
+            "target IP is outside configured target CIDRs: {ip}"
         )));
     };
 
@@ -294,11 +294,7 @@ mod tests {
     use crate::mapping::{Mapping, MappingBackend, MappingMode, Protocol};
 
     fn config() -> EdgeConfig {
-        EdgeConfig::new(
-            "ens3",
-            "tailscale0",
-            vec!["192.168.20.0/24".parse().unwrap()],
-        )
+        EdgeConfig::new("ens3", "wt0", vec!["192.168.20.0/24".parse().unwrap()])
     }
 
     fn mapping() -> Mapping {
@@ -311,12 +307,25 @@ mod tests {
     }
 
     #[test]
-    fn accepts_valid_mapping_inside_home_cidr() {
+    fn accepts_valid_mapping_inside_target_cidr() {
         validate_mapping(&mapping(), &config()).unwrap();
     }
 
     #[test]
-    fn rejects_target_outside_home_cidrs() {
+    fn accepts_direct_netbird_target_when_overlay_cidr_is_configured() {
+        let config = EdgeConfig::new("enp0s6", "wt0", vec!["100.64.0.0/16".parse().unwrap()]);
+        let mapping = Mapping::new(
+            "direct-peer",
+            Some("8.8.8.8".parse().unwrap()),
+            "10.0.0.101".parse().unwrap(),
+            "100.64.34.182".parse().unwrap(),
+        );
+
+        validate_mapping(&mapping, &config).unwrap();
+    }
+
+    #[test]
+    fn rejects_target_outside_target_cidrs() {
         let mut mapping = mapping();
         mapping.target_ip = "192.168.30.42".parse().unwrap();
 
@@ -324,7 +333,9 @@ mod tests {
 
         assert_eq!(
             err,
-            EdgeCoreError::validation("target IP is outside configured home CIDRs: 192.168.30.42")
+            EdgeCoreError::validation(
+                "target IP is outside configured target CIDRs: 192.168.30.42"
+            )
         );
     }
 

@@ -19,7 +19,7 @@ axum.workspace = true
 bytes.workspace = true
 clap.workspace = true
 edge-core = { path = "../edge-core" }
-edge-tailscale = { path = "../edge-tailscale" }
+edge-netbird = { path = "../edge-netbird" }
 http-body-util.workspace = true
 hyper.workspace = true
 hyper-util.workspace = true

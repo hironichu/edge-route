@@ -40,11 +40,11 @@ struct Cli {
     #[arg(long, default_value = "ens3")]
     wan_interface: String,
 
-    #[arg(long, default_value = "tailscale0")]
-    tailscale_interface: String,
+    #[arg(long, default_value = "wt0")]
+    netbird_interface: String,
 
-    #[arg(long = "home-cidr", default_value = "192.168.0.0/16")]
-    home_cidrs: Vec<Ipv4Net>,
+    #[arg(long = "target-cidr", default_value = "192.168.0.0/16")]
+    target_cidrs: Vec<Ipv4Net>,
 }
 
 #[tokio::main]
@@ -56,16 +56,19 @@ async fn main() -> Result<()> {
     let cli = Cli::parse();
     reject_public_bind(cli.bind)?;
 
+    let config_is_authoritative = cli.config.is_some();
     let requested_config = load_config(
         cli.config.as_deref(),
         cli.wan_interface,
-        cli.tailscale_interface,
-        cli.home_cidrs,
+        cli.netbird_interface,
+        cli.target_cidrs,
     )?;
     let store = SqliteStore::connect(&cli.db)
         .await
         .with_context(|| format!("open state database {}", cli.db.display()))?;
-    let mut config = store.ensure_edge_config(requested_config).await?;
+    let mut config = store
+        .resolve_edge_config(requested_config, config_is_authoritative)
+        .await?;
     if config.api_token.is_none() {
         config.api_token = cli.api_token;
     }
@@ -100,8 +103,8 @@ async fn main() -> Result<()> {
 #[derive(Debug, Deserialize)]
 struct FileConfig {
     wan_interface: Option<String>,
-    tailscale_interface: Option<String>,
-    home_cidrs: Option<Vec<Ipv4Net>>,
+    netbird_interface: Option<String>,
+    target_cidrs: Option<Vec<Ipv4Net>>,
     oci_compartment_id: Option<String>,
     oci_vnic_id: Option<String>,
     oci_subnet_id: Option<String>,
@@ -114,10 +117,10 @@ struct FileConfig {
 fn load_config(
     path: Option<&Path>,
     wan_interface: String,
-    tailscale_interface: String,
-    home_cidrs: Vec<Ipv4Net>,
+    netbird_interface: String,
+    target_cidrs: Vec<Ipv4Net>,
 ) -> Result<EdgeConfig> {
-    let mut config = EdgeConfig::new(wan_interface, tailscale_interface, home_cidrs);
+    let mut config = EdgeConfig::new(wan_interface, netbird_interface, target_cidrs);
     let Some(path) = path else {
         return Ok(config);
     };
@@ -128,11 +131,11 @@ fn load_config(
     if let Some(value) = file.wan_interface {
         config.wan_interface = value;
     }
-    if let Some(value) = file.tailscale_interface {
-        config.tailscale_interface = value;
+    if let Some(value) = file.netbird_interface {
+        config.netbird_interface = value;
     }
-    if let Some(value) = file.home_cidrs {
-        config.home_cidrs = value;
+    if let Some(value) = file.target_cidrs {
+        config.target_cidrs = value;
     }
     config.oci_compartment_id = file.oci_compartment_id;
     config.oci_vnic_id = file.oci_vnic_id;

@@ -194,11 +194,11 @@ fn plan_entry(mapping: &Mapping, edge_config: &EdgeConfig) -> Result<XdpForwardE
             "XDP mappings require target_port".to_owned(),
         )
     })?;
-    if !edge_config.contains_home_target(mapping.target_ip) {
+    if !edge_config.contains_target(mapping.target_ip) {
         return Err(XdpError::Mapping(
             mapping.id.to_string(),
             format!(
-                "target IP is outside configured home CIDRs: {}",
+                "target IP is outside configured target CIDRs: {}",
                 mapping.target_ip
             ),
         ));
@@ -234,7 +234,7 @@ mod tests {
     use edge_core::{EdgeConfig, Mapping, MappingBackend, MappingMode, Protocol};
 
     fn config() -> EdgeConfig {
-        EdgeConfig::new("ens3", "tailscale0", vec!["10.10.40.0/24".parse().unwrap()])
+        EdgeConfig::new("ens3", "wt0", vec!["10.10.40.0/24".parse().unwrap()])
     }
 
     fn xdp_mapping() -> Mapping {

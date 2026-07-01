@@ -1,5 +1,5 @@
 # Optional token for raw /api/* proxy access.
-# Server-rendered /ui/* pages rely on Tailscale ACL/grants instead.
+# Server-rendered /ui/* pages rely on a narrow NetBird TCP policy instead.
 # gateway_token = "replace-with-long-random-gateway-token"
 
 # Token used only by edge-gateway when proxying to edge-agent.

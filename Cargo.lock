@@ -377,11 +377,11 @@ dependencies = [
  "axum",
  "clap",
  "edge-core",
+ "edge-netbird",
  "edge-nft",
  "edge-oci",
  "edge-reconcile",
  "edge-store",
- "edge-tailscale",
  "edge-xdp",
  "ipnet",
  "serde",
@@ -400,11 +400,11 @@ dependencies = [
  "anyhow",
  "clap",
  "edge-core",
+ "edge-netbird",
  "edge-nft",
  "edge-oci",
  "edge-reconcile",
  "edge-store",
- "edge-tailscale",
  "edge-xdp",
  "ipnet",
  "serde",
@@ -434,7 +434,7 @@ dependencies = [
  "bytes",
  "clap",
  "edge-core",
- "edge-tailscale",
+ "edge-netbird",
  "http-body-util",
  "hyper",
  "hyper-util",
@@ -454,6 +454,16 @@ dependencies = [
 name = "edge-linux"
 version = "0.1.0"
 dependencies = [
+ "thiserror 1.0.69",
+ "tokio",
+]
+
+[[package]]
+name = "edge-netbird"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
  "thiserror 1.0.69",
  "tokio",
 ]
@@ -503,16 +513,6 @@ dependencies = [
  "sqlx",
  "tempfile",
  "time",
- "tokio",
-]
-
-[[package]]
-name = "edge-tailscale"
-version = "0.1.0"
-dependencies = [
- "serde",
- "serde_json",
- "thiserror 1.0.69",
  "tokio",
 ]
 

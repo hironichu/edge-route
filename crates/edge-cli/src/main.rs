@@ -8,11 +8,11 @@ use edge_core::{
     EdgeConfig, Mapping, MappingBackend, MappingId, MappingMode, MappingStatus, OciAuthMode,
     Protocol,
 };
+use edge_netbird::NetbirdCli;
 use edge_nft::{render_nftables, NftRenderConfig};
 use edge_oci::OciCli;
 use edge_reconcile::{ReconcileOptions, Reconciler};
 use edge_store::SqliteStore;
-use edge_tailscale::TailscaleCli;
 use edge_xdp::XdpConfig;
 use ipnet::Ipv4Net;
 use serde::Deserialize;
@@ -33,11 +33,11 @@ struct Cli {
     #[arg(long, default_value = "ens3")]
     wan_interface: String,
 
-    #[arg(long, default_value = "tailscale0")]
-    tailscale_interface: String,
+    #[arg(long, default_value = "wt0")]
+    netbird_interface: String,
 
-    #[arg(long = "home-cidr", default_value = "192.168.0.0/16")]
-    home_cidrs: Vec<Ipv4Net>,
+    #[arg(long = "target-cidr", default_value = "192.168.0.0/16")]
+    target_cidrs: Vec<Ipv4Net>,
 
     #[command(subcommand)]
     command: Command,
@@ -57,9 +57,10 @@ enum Command {
         command: OracleCommand,
     },
     Status,
-    Tailscale {
+    #[command(name = "netbird")]
+    NetBird {
         #[command(subcommand)]
-        command: TailscaleCommand,
+        command: NetbirdCommand,
     },
 }
 
@@ -217,9 +218,9 @@ enum OracleVnicCommand {
 }
 
 #[derive(Debug, Subcommand)]
-enum TailscaleCommand {
+enum NetbirdCommand {
     Status,
-    Routes,
+    Networks,
     Check {
         target: Ipv4Addr,
         #[arg(long)]
@@ -230,16 +231,19 @@ enum TailscaleCommand {
 #[tokio::main]
 async fn main() -> Result<()> {
     let cli = Cli::parse();
-    let config = load_config(
+    let config_is_authoritative = cli.config.is_some();
+    let requested_config = load_config(
         cli.config.as_deref(),
         cli.wan_interface,
-        cli.tailscale_interface,
-        cli.home_cidrs,
+        cli.netbird_interface,
+        cli.target_cidrs,
     )?;
     let store = SqliteStore::connect(&cli.db)
         .await
         .with_context(|| format!("open state database {}", cli.db.display()))?;
-    let config = store.ensure_edge_config(config).await?;
+    let config = store
+        .resolve_edge_config(requested_config, config_is_authoritative)
+        .await?;
 
     match cli.command {
         Command::Map { command } => handle_map(command, &store, &config).await,
@@ -248,7 +252,7 @@ async fn main() -> Result<()> {
         Command::Rollback(args) => handle_rollback(args, &store).await,
         Command::Oracle { command } => handle_oracle(command, &store).await,
         Command::Status => handle_status(&store, &config).await,
-        Command::Tailscale { command } => handle_tailscale(command).await,
+        Command::NetBird { command } => handle_netbird(command, &config.netbird_interface).await,
     }
 }
 
@@ -256,7 +260,7 @@ async fn handle_map(command: MapCommand, store: &SqliteStore, config: &EdgeConfi
     match command {
         MapCommand::Create(args) => {
             if !args.skip_route_check {
-                validate_tailscale_route(args.target, &config.tailscale_interface).await?;
+                validate_netbird_route(args.target, &config.netbird_interface).await?;
             }
             let name = args
                 .name
@@ -589,49 +593,61 @@ fn is_oci_not_found(error: &edge_oci::OciError) -> bool {
     text.contains("notfound") || text.contains("not found") || text.contains("404")
 }
 
-async fn validate_tailscale_route(target: Ipv4Addr, tailscale_interface: &str) -> Result<()> {
-    let tailscale = TailscaleCli::default();
-    let route = tailscale.route_get(target).await?;
-    if !route.route.contains(tailscale_interface) {
+async fn validate_netbird_route(target: Ipv4Addr, netbird_interface: &str) -> Result<()> {
+    let netbird = NetbirdCli::default();
+    let route = netbird.route_get(target).await?;
+    if !route.uses_interface(netbird_interface) {
         anyhow::bail!(
             "target route does not use {}: {}",
-            tailscale_interface,
+            netbird_interface,
             route.route
         );
     }
     Ok(())
 }
 
-async fn handle_tailscale(command: TailscaleCommand) -> Result<()> {
-    let tailscale = TailscaleCli::default();
+async fn handle_netbird(command: NetbirdCommand, netbird_interface: &str) -> Result<()> {
+    let netbird = NetbirdCli::default();
     match command {
-        TailscaleCommand::Status => {
-            let status = tailscale.status().await?;
+        NetbirdCommand::Status => {
+            let status = netbird.status().await?;
             println!(
-                "BackendState: {}",
-                status.backend_state.as_deref().unwrap_or("unknown")
+                "Daemon: {}",
+                status.daemon_status.as_deref().unwrap_or("unknown")
             );
-            if let Some(self_node) = status.self_node {
-                println!("Self: {}", self_node.host_name.as_deref().unwrap_or("-"));
-                println!("TailscaleIPs: {}", self_node.tailscale_ips.join(","));
-            }
-            println!("Peers: {}", status.peers.len());
+            println!("FQDN: {}", status.fqdn.as_deref().unwrap_or("-"));
+            println!(
+                "NetBird IPv4: {}",
+                status.netbird_ip.as_deref().unwrap_or("-")
+            );
+            println!(
+                "NetBird IPv6: {}",
+                status.netbird_ipv6.as_deref().unwrap_or("-")
+            );
+            println!(
+                "Peers: {}/{} connected",
+                status.peers.connected, status.peers.total
+            );
         }
-        TailscaleCommand::Routes => {
-            let status = tailscale.status().await?;
-            for route in status.advertised_routes() {
-                println!("{route}");
+        NetbirdCommand::Networks => {
+            let status = netbird.status().await?;
+            for network in status.advertised_networks() {
+                println!("{network}");
             }
         }
-        TailscaleCommand::Check { target, ping } => {
-            let route = tailscale.route_get(target).await?;
+        NetbirdCommand::Check { target, ping } => {
+            let route = netbird.route_get(target).await?;
             println!("Route: {}", route.route);
-            println!("Via tailscale0: {}", route.via_tailscale);
-            if !route.via_tailscale {
-                anyhow::bail!("target route does not use tailscale0: {target}");
+            println!("Interface: {}", route.interface.as_deref().unwrap_or("-"));
+            if !route.uses_interface(netbird_interface) {
+                anyhow::bail!(
+                    "target route does not use {}: {}",
+                    netbird_interface,
+                    route.route
+                );
             }
             if ping {
-                tailscale.ping_once(target).await?;
+                netbird.ping_once(target).await?;
                 println!("Ping: ok");
             }
         }
@@ -643,8 +659,8 @@ async fn handle_status(store: &SqliteStore, config: &EdgeConfig) -> Result<()> {
     let mappings = store.list_mappings().await?;
     let enabled = mappings.iter().filter(|mapping| mapping.enabled).count();
     println!("WAN interface: {}", config.wan_interface);
-    println!("Tailscale interface: {}", config.tailscale_interface);
-    println!("Home CIDRs: {:?}", config.home_cidrs);
+    println!("NetBird interface: {}", config.netbird_interface);
+    println!("Target CIDRs: {:?}", config.target_cidrs);
     println!("Mappings: {} total, {} enabled", mappings.len(), enabled);
     Ok(())
 }
@@ -677,8 +693,8 @@ fn print_mapping_line(mapping: &Mapping) {
 #[derive(Debug, Deserialize)]
 struct FileConfig {
     wan_interface: Option<String>,
-    tailscale_interface: Option<String>,
-    home_cidrs: Option<Vec<Ipv4Net>>,
+    netbird_interface: Option<String>,
+    target_cidrs: Option<Vec<Ipv4Net>>,
     oci_compartment_id: Option<String>,
     oci_vnic_id: Option<String>,
     oci_subnet_id: Option<String>,
@@ -691,10 +707,10 @@ struct FileConfig {
 fn load_config(
     path: Option<&std::path::Path>,
     wan_interface: String,
-    tailscale_interface: String,
-    home_cidrs: Vec<Ipv4Net>,
+    netbird_interface: String,
+    target_cidrs: Vec<Ipv4Net>,
 ) -> Result<EdgeConfig> {
-    let mut config = EdgeConfig::new(wan_interface, tailscale_interface, home_cidrs);
+    let mut config = EdgeConfig::new(wan_interface, netbird_interface, target_cidrs);
     let Some(path) = path else {
         return Ok(config);
     };
@@ -705,11 +721,11 @@ fn load_config(
     if let Some(value) = file.wan_interface {
         config.wan_interface = value;
     }
-    if let Some(value) = file.tailscale_interface {
-        config.tailscale_interface = value;
+    if let Some(value) = file.netbird_interface {
+        config.netbird_interface = value;
     }
-    if let Some(value) = file.home_cidrs {
-        config.home_cidrs = value;
+    if let Some(value) = file.target_cidrs {
+        config.target_cidrs = value;
     }
     config.oci_compartment_id = file.oci_compartment_id;
     config.oci_vnic_id = file.oci_vnic_id;

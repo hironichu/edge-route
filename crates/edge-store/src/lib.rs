@@ -311,6 +311,19 @@ impl SqliteStore {
         Ok(config)
     }
 
+    pub async fn resolve_edge_config(
+        &self,
+        config: EdgeConfig,
+        authoritative: bool,
+    ) -> edge_core::Result<EdgeConfig> {
+        if authoritative {
+            self.set_edge_config(&config).await?;
+            Ok(config)
+        } else {
+            self.ensure_edge_config(config).await
+        }
+    }
+
     pub async fn insert_mapping(&self, mapping: &Mapping) -> edge_core::Result<()> {
         let config = self
             .edge_config()
@@ -711,11 +724,7 @@ mod tests {
     use edge_core::{MappingBackend, MappingMode, Protocol};
 
     fn config() -> EdgeConfig {
-        EdgeConfig::new(
-            "ens3",
-            "tailscale0",
-            vec!["192.168.20.0/24".parse().unwrap()],
-        )
+        EdgeConfig::new("ens3", "wt0", vec!["192.168.20.0/24".parse().unwrap()])
     }
 
     fn mapping() -> Mapping {
@@ -739,6 +748,40 @@ mod tests {
         mapping.public_port = Some(public_port);
         mapping.target_port = Some(target_port);
         mapping
+    }
+
+    #[tokio::test]
+    async fn authoritative_config_replaces_persisted_config() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = SqliteStore::connect(dir.path().join("state.sqlite"))
+            .await
+            .unwrap();
+        let old = config();
+        store.set_edge_config(&old).await.unwrap();
+        let replacement = EdgeConfig::new("enp0s6", "wt0", vec!["10.10.40.0/24".parse().unwrap()]);
+
+        let resolved = store
+            .resolve_edge_config(replacement.clone(), true)
+            .await
+            .unwrap();
+
+        assert_eq!(resolved, replacement);
+        assert_eq!(store.edge_config().await.unwrap(), Some(replacement));
+    }
+
+    #[tokio::test]
+    async fn defaults_do_not_replace_persisted_config() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = SqliteStore::connect(dir.path().join("state.sqlite"))
+            .await
+            .unwrap();
+        let persisted = EdgeConfig::new("enp0s6", "wt0", vec!["10.10.40.0/24".parse().unwrap()]);
+        store.set_edge_config(&persisted).await.unwrap();
+
+        let resolved = store.resolve_edge_config(config(), false).await.unwrap();
+
+        assert_eq!(resolved, persisted);
+        assert_eq!(store.edge_config().await.unwrap(), Some(persisted));
     }
 
     #[tokio::test]

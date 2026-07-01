@@ -88,9 +88,9 @@ pub fn render_nftables(
     output.push_str("    }\n\n");
     output.push_str("    chain postrouting {\n");
     output.push_str("        type nat hook postrouting priority srcnat; policy accept;\n\n");
-    for cidr in &edge_config.home_cidrs {
+    for cidr in &edge_config.target_cidrs {
         output.push_str("        oifname \"");
-        output.push_str(&edge_config.tailscale_interface);
+        output.push_str(&edge_config.netbird_interface);
         output.push_str("\" ip daddr ");
         output.push_str(&cidr.to_string());
         output.push_str(" masquerade\n");
@@ -116,11 +116,7 @@ mod tests {
 
     #[test]
     fn renders_static_mapping_rules() {
-        let config = EdgeConfig::new(
-            "ens3",
-            "tailscale0",
-            vec!["192.168.20.0/24".parse().unwrap()],
-        );
+        let config = EdgeConfig::new("ens3", "wt0", vec!["192.168.20.0/24".parse().unwrap()]);
         let mapping = Mapping::new(
             "prod_vm_1",
             None,
@@ -134,16 +130,12 @@ mod tests {
         assert!(rendered.contains("table ip edge_nat"));
         assert!(rendered.contains("10.0.0.101 : 192.168.20.42,"));
         assert!(rendered.contains("dnat to ip daddr map @edge_to_target"));
-        assert!(rendered.contains("oifname \"tailscale0\" ip daddr 192.168.20.0/24 masquerade"));
+        assert!(rendered.contains("oifname \"wt0\" ip daddr 192.168.20.0/24 masquerade"));
     }
 
     #[test]
     fn explicit_nft_backend_preserves_rendered_output() {
-        let config = EdgeConfig::new(
-            "ens3",
-            "tailscale0",
-            vec!["192.168.20.0/24".parse().unwrap()],
-        );
+        let config = EdgeConfig::new("ens3", "wt0", vec!["192.168.20.0/24".parse().unwrap()]);
         let default_mapping = Mapping::new(
             "prod_vm_1",
             None,
@@ -163,7 +155,7 @@ mod tests {
 
     #[test]
     fn renders_port_forward_rules() {
-        let config = EdgeConfig::new("ens3", "tailscale0", vec!["10.10.40.0/24".parse().unwrap()]);
+        let config = EdgeConfig::new("ens3", "wt0", vec!["10.10.40.0/24".parse().unwrap()]);
         let mut tcp = Mapping::new(
             "mysql",
             Some("8.8.8.8".parse().unwrap()),
@@ -194,6 +186,40 @@ mod tests {
         assert!(rendered.contains(
             "iifname \"ens3\" ip daddr 10.0.0.101 udp dport 14444 dnat to 10.10.40.60:4444"
         ));
-        assert!(rendered.contains("oifname \"tailscale0\" ip daddr 10.10.40.0/24 masquerade"));
+        assert!(rendered.contains("oifname \"wt0\" ip daddr 10.10.40.0/24 masquerade"));
+    }
+
+    #[test]
+    fn renders_initial_netbird_cutover_rules() {
+        let config = EdgeConfig::new(
+            "enp0s6",
+            "wt0",
+            vec![
+                "10.10.30.0/24".parse().unwrap(),
+                "10.10.40.0/24".parse().unwrap(),
+                "10.10.50.0/24".parse().unwrap(),
+            ],
+        );
+        let first = Mapping::new(
+            "target-88",
+            None,
+            "10.0.0.101".parse().unwrap(),
+            "10.10.40.88".parse().unwrap(),
+        );
+        let second = Mapping::new(
+            "target-89",
+            None,
+            "10.0.0.102".parse().unwrap(),
+            "10.10.40.89".parse().unwrap(),
+        );
+
+        let rendered =
+            render_nftables(&[first, second], &config, &NftRenderConfig::default()).unwrap();
+
+        assert!(rendered.contains("10.0.0.101 : 10.10.40.88"));
+        assert!(rendered.contains("10.0.0.102 : 10.10.40.89"));
+        for cidr in ["10.10.30.0/24", "10.10.40.0/24", "10.10.50.0/24"] {
+            assert!(rendered.contains(&format!("oifname \"wt0\" ip daddr {cidr} masquerade")));
+        }
     }
 }

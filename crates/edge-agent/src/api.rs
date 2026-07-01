@@ -4,22 +4,23 @@ use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
 
-use axum::extract::{Path, State};
+use axum::extract::{Path, Query, State};
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use edge_core::{
-    EdgeConfig, EdgeCoreError, Mapping, MappingBackend, MappingId, MappingMode, OciAuthMode,
-    Protocol,
+    EdgeConfig, EdgeCoreError, EventLevel, Mapping, MappingBackend, MappingId, MappingMode,
+    MappingStatus, OciAuthMode, Protocol,
 };
+use edge_netbird::NetbirdCli;
 use edge_nft::{render_nftables, NftRenderConfig};
-use edge_oci::OciCli;
+use edge_oci::{IngressSecurityRule, OciCli, OciError, PortOptions, PortRange, PublicIp};
 use edge_reconcile::{ReconcileOptions, Reconciler};
 use edge_store::SqliteStore;
-use edge_tailscale::TailscaleCli;
 use edge_xdp::XdpConfig;
 use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
 
 #[derive(Clone)]
 struct AppState {
@@ -40,12 +41,18 @@ pub fn router(store: SqliteStore, config: EdgeConfig) -> Router {
         .route("/v1/mappings/{id}/disable", post(disable_mapping))
         .route("/v1/apply/dry-run", post(dry_run_apply))
         .route("/v1/reconcile", post(reconcile))
-        .route("/v1/tailscale/status", get(tailscale_status))
-        .route("/v1/tailscale/routes", get(tailscale_routes))
+        .route("/v1/netbird/status", get(netbird_status))
+        .route("/v1/netbird/networks", get(netbird_networks))
         .route("/v1/events", get(events))
         .route("/v1/analytics", get(analytics))
         .route("/v1/topology", get(topology))
         .route("/v1/oci/status", get(oci_status))
+        .route("/v1/oci/allocate", post(oci_allocate))
+        .route("/v1/oci/release", post(oci_release))
+        .route("/v1/oci/vnic/check", get(oci_vnic_check))
+        .route("/v1/oci/public-ips", get(oci_public_ips))
+        .route("/v1/oci/nsg/add", post(oci_nsg_add))
+        .route("/v1/oci/nsg/remove", post(oci_nsg_remove))
         .with_state(state)
 }
 
@@ -57,7 +64,13 @@ async fn status(
     let mappings = state.store.list_mappings().await?;
     Ok(Json(StatusResponse {
         wan_interface: state.config.wan_interface,
-        tailscale_interface: state.config.tailscale_interface,
+        netbird_interface: state.config.netbird_interface,
+        target_cidrs: state
+            .config
+            .target_cidrs
+            .iter()
+            .map(ToString::to_string)
+            .collect(),
         mappings: mappings.len(),
         enabled_mappings: mappings.iter().filter(|mapping| mapping.enabled).count(),
     }))
@@ -205,29 +218,29 @@ async fn reconcile(
     }))
 }
 
-async fn tailscale_status(
+async fn netbird_status(
     State(state): State<AppState>,
     headers: HeaderMap,
-) -> Result<Json<edge_tailscale::TailscaleStatus>, ApiError> {
+) -> Result<Json<edge_netbird::NetbirdStatus>, ApiError> {
     require_auth(&state, &headers)?;
     Ok(Json(
-        TailscaleCli::default()
+        NetbirdCli::default()
             .status()
             .await
             .map_err(ApiError::bad_gateway)?,
     ))
 }
 
-async fn tailscale_routes(
+async fn netbird_networks(
     State(state): State<AppState>,
     headers: HeaderMap,
 ) -> Result<Json<Vec<String>>, ApiError> {
     require_auth(&state, &headers)?;
-    let status = TailscaleCli::default()
+    let status = NetbirdCli::default()
         .status()
         .await
         .map_err(ApiError::bad_gateway)?;
-    Ok(Json(status.advertised_routes()))
+    Ok(Json(status.advertised_networks()))
 }
 
 async fn events(
@@ -267,10 +280,10 @@ async fn topology(
     let mappings = state.store.list_mappings().await?;
     Ok(Json(TopologyResponse {
         wan_interface: state.config.wan_interface,
-        tailscale_interface: state.config.tailscale_interface,
-        home_cidrs: state
+        netbird_interface: state.config.netbird_interface,
+        target_cidrs: state
             .config
-            .home_cidrs
+            .target_cidrs
             .iter()
             .map(ToString::to_string)
             .collect(),
@@ -293,7 +306,7 @@ async fn oci_status(
     let api_key_ready = env.tenancy_id && env.user_id && env.fingerprint && env.private_key_path;
     Ok(Json(OciStatusResponse {
         auth_mode: state.config.oci_auth,
-        region: state.config.oci_region,
+        region: state.config.oci_region.clone(),
         compartment_id_configured: state.config.oci_compartment_id.is_some(),
         vnic_id_configured: state.config.oci_vnic_id.is_some(),
         subnet_id_configured: state.config.oci_subnet_id.is_some(),
@@ -302,13 +315,340 @@ async fn oci_status(
         env,
         cli_available: cli.is_ok(),
         cli_version: cli.ok().map(|output| output.stdout.trim().to_owned()),
+        compartment_id: state.config.oci_compartment_id.clone(),
+        vnic_id: state.config.oci_vnic_id.clone(),
+        subnet_id: state.config.oci_subnet_id.clone(),
+        nsg_ids: state.config.oci_nsg_ids.clone(),
     }))
+}
+
+fn require_confirm(value: &str, expected: &str) -> Result<(), ApiError> {
+    if value.trim().eq_ignore_ascii_case(expected) {
+        Ok(())
+    } else {
+        Err(ApiError::bad_request(format!(
+            "confirmation failed: type \"{expected}\" to proceed"
+        )))
+    }
+}
+
+fn resolve(value: Option<String>, fallback: Option<&String>) -> Option<String> {
+    value
+        .as_deref()
+        .map(str::trim)
+        .filter(|v| !v.is_empty())
+        .map(str::to_owned)
+        .or_else(|| fallback.cloned())
+}
+
+#[derive(Debug, Deserialize)]
+struct OciAllocateRequest {
+    mapping_id: String,
+    compartment_id: Option<String>,
+    vnic_id: Option<String>,
+    display_name: Option<String>,
+    #[serde(default)]
+    confirm: String,
+}
+
+async fn oci_allocate(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(request): Json<OciAllocateRequest>,
+) -> Result<Json<Mapping>, ApiError> {
+    require_auth(&state, &headers)?;
+    require_confirm(&request.confirm, "confirm")?;
+    let id = MappingId::from_str(&request.mapping_id)?;
+    let mut mapping = state.store.get_mapping(&id).await?;
+    if mapping.public_ip.is_some()
+        || mapping.oci_public_ip_ocid.is_some()
+        || mapping.oci_private_ip_ocid.is_some()
+    {
+        return Err(ApiError::bad_request(format!(
+            "mapping already has OCI allocation fields: {id}"
+        )));
+    }
+    let compartment_id = resolve(
+        request.compartment_id,
+        state.config.oci_compartment_id.as_ref(),
+    )
+    .ok_or_else(|| {
+        ApiError::bad_request(
+            "missing compartment id (pass compartment_id or set oci_compartment_id)".to_owned(),
+        )
+    })?;
+    let vnic_id = resolve(request.vnic_id, state.config.oci_vnic_id.as_ref()).ok_or_else(|| {
+        ApiError::bad_request("missing vnic id (pass vnic_id or set oci_vnic_id)".to_owned())
+    })?;
+    let name = resolve(request.display_name, None).unwrap_or_else(|| mapping.name.clone());
+
+    let oci = OciCli::default();
+    let allocation = oci
+        .allocate_forwarding_ip(&compartment_id, &vnic_id, Some(&name))
+        .await
+        .map_err(ApiError::from_oci)?;
+
+    mapping.edge_private_ip = allocation.private_ip.ip_address;
+    mapping.public_ip = Some(allocation.public_ip.ip_address);
+    mapping.oci_private_ip_ocid = Some(allocation.private_ip.id.clone());
+    mapping.oci_public_ip_ocid = Some(allocation.public_ip.id.clone());
+    mapping.mark_status(MappingStatus::Pending);
+
+    if let Err(error) = state.store.update_mapping(&mapping).await {
+        let _ = oci.delete_public_ip(&allocation.public_ip.id).await;
+        let _ = oci.delete_private_ip(&allocation.private_ip.id).await;
+        return Err(error.into());
+    }
+    state
+        .store
+        .record_event(
+            EventLevel::Info,
+            "oci allocate",
+            Some(&format!(
+                "mapping {id} public {} private {}",
+                allocation.public_ip.ip_address, allocation.private_ip.ip_address
+            )),
+        )
+        .await
+        .ok();
+    Ok(Json(mapping))
+}
+
+#[derive(Debug, Deserialize)]
+struct OciReleaseRequest {
+    mapping_id: Option<String>,
+    public_ip_id: Option<String>,
+    private_ip_id: Option<String>,
+    #[serde(default)]
+    confirm: String,
+}
+
+async fn oci_release(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(request): Json<OciReleaseRequest>,
+) -> Result<Json<Value>, ApiError> {
+    require_auth(&state, &headers)?;
+    require_confirm(&request.confirm, "delete")?;
+    let oci = OciCli::default();
+
+    if let Some(mapping_id) = resolve(request.mapping_id, None) {
+        let id = MappingId::from_str(&mapping_id)?;
+        let mut mapping = state.store.get_mapping(&id).await?;
+        let public = mapping.oci_public_ip_ocid.clone();
+        let private = mapping.oci_private_ip_ocid.clone();
+        if public.is_none() && private.is_none() {
+            return Err(ApiError::bad_request(format!(
+                "mapping has no OCI allocation to release: {id}"
+            )));
+        }
+        if let Some(public_ip_id) = &public {
+            oci.delete_public_ip(public_ip_id)
+                .await
+                .map_err(ApiError::from_oci)?;
+        }
+        if let Some(private_ip_id) = &private {
+            oci.delete_private_ip(private_ip_id)
+                .await
+                .map_err(ApiError::from_oci)?;
+        }
+        mapping.public_ip = None;
+        mapping.oci_public_ip_ocid = None;
+        mapping.oci_private_ip_ocid = None;
+        mapping.mark_status(MappingStatus::Disabled);
+        state.store.update_mapping(&mapping).await?;
+        state
+            .store
+            .record_event(
+                EventLevel::Warn,
+                "oci release",
+                Some(&format!("mapping {id}")),
+            )
+            .await
+            .ok();
+        return Ok(Json(json!({
+            "released": true,
+            "mapping_id": id.to_string(),
+            "public_ip_id": public,
+            "private_ip_id": private,
+        })));
+    }
+
+    let public = resolve(request.public_ip_id, None);
+    let private = resolve(request.private_ip_id, None);
+    if public.is_none() && private.is_none() {
+        return Err(ApiError::bad_request(
+            "release needs mapping_id or public_ip_id/private_ip_id".to_owned(),
+        ));
+    }
+    if let Some(public_ip_id) = &public {
+        oci.delete_public_ip(public_ip_id)
+            .await
+            .map_err(ApiError::from_oci)?;
+    }
+    if let Some(private_ip_id) = &private {
+        oci.delete_private_ip(private_ip_id)
+            .await
+            .map_err(ApiError::from_oci)?;
+    }
+    Ok(Json(json!({
+        "released": true,
+        "public_ip_id": public,
+        "private_ip_id": private,
+    })))
+}
+
+#[derive(Debug, Deserialize)]
+struct VnicQuery {
+    vnic_id: Option<String>,
+}
+
+async fn oci_vnic_check(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Query(query): Query<VnicQuery>,
+) -> Result<Json<Value>, ApiError> {
+    require_auth(&state, &headers)?;
+    let vnic_id = resolve(query.vnic_id, state.config.oci_vnic_id.as_ref()).ok_or_else(|| {
+        ApiError::bad_request("missing vnic id (pass vnic_id or set oci_vnic_id)".to_owned())
+    })?;
+    let oci = OciCli::default();
+    let vnic = oci.get_vnic(&vnic_id).await.map_err(ApiError::from_oci)?;
+    let ok = edge_oci::validate_vnic_forwarding(&vnic).is_ok();
+    Ok(Json(json!({
+        "id": vnic.id,
+        "display_name": vnic.display_name,
+        "skip_source_dest_check": vnic.skip_source_dest_check,
+        "ok": ok,
+    })))
+}
+
+#[derive(Debug, Deserialize)]
+struct PublicIpQuery {
+    compartment_id: Option<String>,
+}
+
+async fn oci_public_ips(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Query(query): Query<PublicIpQuery>,
+) -> Result<Json<Vec<PublicIp>>, ApiError> {
+    require_auth(&state, &headers)?;
+    let compartment_id = resolve(
+        query.compartment_id,
+        state.config.oci_compartment_id.as_ref(),
+    )
+    .ok_or_else(|| {
+        ApiError::bad_request(
+            "missing compartment id (pass compartment_id or set oci_compartment_id)".to_owned(),
+        )
+    })?;
+    let oci = OciCli::default();
+    let ips = oci
+        .list_public_ips(&compartment_id)
+        .await
+        .map_err(ApiError::from_oci)?;
+    Ok(Json(ips))
+}
+
+#[derive(Debug, Deserialize)]
+struct OciNsgAddRequest {
+    nsg_id: Option<String>,
+    protocol: String,
+    source: String,
+    port_min: Option<u16>,
+    port_max: Option<u16>,
+    description: Option<String>,
+    #[serde(default)]
+    confirm: String,
+}
+
+async fn oci_nsg_add(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(request): Json<OciNsgAddRequest>,
+) -> Result<Json<Value>, ApiError> {
+    require_auth(&state, &headers)?;
+    require_confirm(&request.confirm, "confirm")?;
+    let nsg_id = resolve(request.nsg_id, state.config.oci_nsg_ids.first()).ok_or_else(|| {
+        ApiError::bad_request("missing nsg id (pass nsg_id or set oci_nsg_ids)".to_owned())
+    })?;
+    let protocol = match request.protocol.trim().to_ascii_lowercase().as_str() {
+        "tcp" | "6" => "6".to_owned(),
+        "udp" | "17" => "17".to_owned(),
+        "all" => "all".to_owned(),
+        other => other.to_owned(),
+    };
+    let port_options = match (request.port_min, request.port_max) {
+        (Some(min), Some(max)) => Some(PortOptions {
+            destination_port_range: PortRange { min, max },
+        }),
+        (Some(port), None) | (None, Some(port)) => Some(PortOptions {
+            destination_port_range: PortRange {
+                min: port,
+                max: port,
+            },
+        }),
+        (None, None) => None,
+    };
+    let (tcp_options, udp_options) = match protocol.as_str() {
+        "6" => (port_options, None),
+        "17" => (None, port_options),
+        _ => (None, None),
+    };
+    let rule = IngressSecurityRule {
+        protocol,
+        source: request.source.trim().to_owned(),
+        tcp_options,
+        udp_options,
+        description: resolve(request.description, None),
+    };
+    OciCli::default()
+        .add_nsg_rules(&nsg_id, &[rule])
+        .await
+        .map_err(ApiError::from_oci)?;
+    Ok(Json(json!({ "added": true, "nsg_id": nsg_id })))
+}
+
+#[derive(Debug, Deserialize)]
+struct OciNsgRemoveRequest {
+    nsg_id: Option<String>,
+    rule_ids: Vec<String>,
+    #[serde(default)]
+    confirm: String,
+}
+
+async fn oci_nsg_remove(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(request): Json<OciNsgRemoveRequest>,
+) -> Result<Json<Value>, ApiError> {
+    require_auth(&state, &headers)?;
+    require_confirm(&request.confirm, "delete")?;
+    let nsg_id = resolve(request.nsg_id, state.config.oci_nsg_ids.first()).ok_or_else(|| {
+        ApiError::bad_request("missing nsg id (pass nsg_id or set oci_nsg_ids)".to_owned())
+    })?;
+    let rule_ids: Vec<String> = request
+        .rule_ids
+        .into_iter()
+        .map(|id| id.trim().to_owned())
+        .filter(|id| !id.is_empty())
+        .collect();
+    if rule_ids.is_empty() {
+        return Err(ApiError::bad_request("no rule ids supplied".to_owned()));
+    }
+    OciCli::default()
+        .remove_nsg_rules(&nsg_id, &rule_ids)
+        .await
+        .map_err(ApiError::from_oci)?;
+    Ok(Json(json!({ "removed": rule_ids.len(), "nsg_id": nsg_id })))
 }
 
 #[derive(Debug, Serialize)]
 struct StatusResponse {
     wan_interface: String,
-    tailscale_interface: String,
+    netbird_interface: String,
+    target_cidrs: Vec<String>,
     mappings: usize,
     enabled_mappings: usize,
 }
@@ -326,8 +666,8 @@ struct AnalyticsResponse {
 #[derive(Debug, Serialize)]
 struct TopologyResponse {
     wan_interface: String,
-    tailscale_interface: String,
-    home_cidrs: Vec<String>,
+    netbird_interface: String,
+    target_cidrs: Vec<String>,
     flows: Vec<TopologyFlow>,
 }
 
@@ -357,6 +697,11 @@ struct OciStatusResponse {
     env: OciEnvStatus,
     cli_available: bool,
     cli_version: Option<String>,
+    // Actual configured values, so the UI can prefill action forms.
+    compartment_id: Option<String>,
+    vnic_id: Option<String>,
+    subnet_id: Option<String>,
+    nsg_ids: Vec<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -500,6 +845,20 @@ impl ApiError {
     }
 
     fn bad_gateway(error: impl std::fmt::Display) -> Self {
+        Self {
+            status: StatusCode::BAD_GATEWAY,
+            message: error.to_string(),
+        }
+    }
+
+    fn bad_request(message: String) -> Self {
+        Self {
+            status: StatusCode::BAD_REQUEST,
+            message,
+        }
+    }
+
+    fn from_oci(error: OciError) -> Self {
         Self {
             status: StatusCode::BAD_GATEWAY,
             message: error.to_string(),

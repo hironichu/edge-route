@@ -299,11 +299,7 @@ mod tests {
     use crate::mapping::Mapping;
 
     fn config() -> EdgeConfig {
-        EdgeConfig::new(
-            "ens3",
-            "tailscale0",
-            vec!["192.168.20.0/24".parse().unwrap()],
-        )
+        EdgeConfig::new("ens3", "wt0", vec!["192.168.20.0/24".parse().unwrap()])
     }
 
     fn mapping() -> Mapping {

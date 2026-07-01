@@ -2,7 +2,7 @@
 
 ## Scope
 
-EdgeRoute should run on the Linux edge host that owns the OCI VNIC/private IPs and has a Tailscale route to the home CIDRs. The default `nft` backend generates nftables rules that DNAT from each edge private IP to a target IP, then SNAT traffic going out `tailscale0` toward the home CIDRs.
+EdgeRoute should run on the Linux edge host that owns the OCI VNIC/private IPs and has a NetBird route to the target CIDRs. The default `nft` backend generates nftables rules that DNAT from each edge private IP to a target IP, then SNAT traffic going out `wt0` toward the target CIDRs.
 
 ## Requirements
 
@@ -13,7 +13,7 @@ EdgeRoute should run on the Linux edge host that owns the OCI VNIC/private IPs a
 - IPv4 forwarding enabled: `sudo sysctl -w net.ipv4.ip_forward=1`, then persist in `/etc/sysctl.d/99-edgeroute.conf`.
 - Rust toolchain for source builds, or prebuilt `edge` and `edge-agent` binaries.
 - OCI direct API auth configured for provisioning, or OCI CLI configured for the current fallback commands.
-- Tailscale installed and logged in on the edge and on the subnet router side.
+- NetBird installed and logged in on the edge and on the subnet router side.
 
 The experimental `xdp` backend currently requires no extra runtime dependency because it only builds dry-run plans. It does not attach eBPF programs or change live packet handling.
 
@@ -26,25 +26,18 @@ Run preflight on Linux:
 
 `linux-arm64-nft-check.sh` creates a temp SQLite DB, renders a sample ruleset with `edge apply --dry-run`, and checks it with `nft -c`. It does not apply rules.
 
-## Tailscale
+## NetBird
 
-On the home-side subnet router, advertise the target LAN:
-
-```sh
-sudo sysctl -w net.ipv4.ip_forward=1
-sudo tailscale up --advertise-routes=192.168.20.0/24
-```
-
-Approve the advertised route in the Tailscale admin console. On the edge host, accept routes if required by your setup, then verify:
+Create NetBird Network resources for the target LAN CIDRs and assign the home-side Linux peer as their routing peer. Attach a policy that permits the edge peer to reach those resources. On the routing peer, confirm IPv4 forwarding is enabled. Then verify from the edge host:
 
 ```sh
-tailscale status
-edge tailscale status
-edge tailscale routes
-edge tailscale check 192.168.20.42 --ping
+netbird status
+edge netbird status
+edge netbird networks
+edge netbird check 10.10.40.89 --ping
 ```
 
-Tailscale can manage Linux firewall rules through iptables or nftables. Do not set Tailscale netfilter mode to `off` unless you intentionally own all required Tailscale firewall rules.
+NetBird manages its own Linux nftables/iptables policy and routing chains. EdgeRoute owns only `table ip edge_nat`; do not flush or rewrite NetBird's tables.
 
 ## OCI Policy Notes
 
@@ -70,7 +63,7 @@ curl -fsSL https://raw.githubusercontent.com/hironichu/edge-route/release/X.X.X/
   | sudo env EDGE_VERSION=X.X.X bash
 ```
 
-The installer detects Linux architecture, the default WAN interface, the Tailscale interface, and home CIDRs routed through Tailscale. It installs release binaries, `/etc/edge-router/config.toml`, `/etc/edge-router/edge-agent.env`, and the systemd unit. It enables `edge-agent` but does not start it unless `EDGE_START_SERVICE=1` is set.
+The installer detects Linux architecture, the default WAN interface, the NetBird interface, and target CIDRs routed through NetBird. It installs release binaries, `/etc/edge-router/config.toml`, `/etc/edge-router/edge-agent.env`, and the systemd unit. It enables `edge-agent` but does not start it unless `EDGE_START_SERVICE=1` is set.
 
 Common overrides:
 
@@ -78,9 +71,9 @@ Common overrides:
 curl -fsSL https://raw.githubusercontent.com/hironichu/edge-route/release/X.X.X/scripts/install.sh \
   | sudo env \
       EDGE_VERSION=X.X.X \
-      EDGE_WAN_INTERFACE=ens3 \
-      EDGE_TAILSCALE_INTERFACE=tailscale0 \
-      EDGE_HOME_CIDRS=10.10.40.0/24 \
+      EDGE_WAN_INTERFACE=enp0s6 \
+      EDGE_NETBIRD_INTERFACE=wt0 \
+      EDGE_TARGET_CIDRS=10.10.30.0/24,10.10.40.0/24,10.10.50.0/24 \
       EDGE_START_SERVICE=1 \
       bash
 ```
@@ -100,30 +93,31 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now edge-agent
 ```
 
-Adjust `systemd/edge-agent.service` before installing if your WAN interface, home CIDRs, bind address, or database path differ from defaults.
+Adjust `systemd/edge-agent.service` before installing if your WAN interface, target CIDRs, bind address, or database path differ from defaults.
 
 ## Create And Validate A Mapping
 
 ```sh
-edge --db /var/lib/edge-router/state.sqlite \
-  --wan-interface ens3 \
-  --tailscale-interface tailscale0 \
-  --home-cidr 192.168.20.0/24 \
+edge --config /etc/edge-router/config.toml \
+  --db /var/lib/edge-router/state.sqlite \
+  --wan-interface enp0s6 \
+  --netbird-interface wt0 \
+  --target-cidr 10.10.40.0/24 \
   map create \
   --backend nft \
   --edge-private-ip 10.0.0.101 \
-  --target 192.168.20.42 \
+  --target 10.10.40.89 \
   --name prod-vm-1
 
-edge --db /var/lib/edge-router/state.sqlite --home-cidr 192.168.20.0/24 apply --dry-run
-sudo edge --db /var/lib/edge-router/state.sqlite --home-cidr 192.168.20.0/24 apply --check
+edge --config /etc/edge-router/config.toml --db /var/lib/edge-router/state.sqlite apply --dry-run
+sudo edge --config /etc/edge-router/config.toml --db /var/lib/edge-router/state.sqlite apply --check
 ```
 
 Port-forward mappings allow one reserved public IP and one OCI private IP to front multiple internal services by protocol and public port:
 
 ```sh
 edge --db /var/lib/edge-router/state.sqlite \
-  --home-cidr 10.10.40.0/24 \
+  --target-cidr 10.10.40.0/24 \
   map create \
   --backend nft \
   --mode port_forward_snat \
@@ -136,7 +130,7 @@ edge --db /var/lib/edge-router/state.sqlite \
   --name mysql
 
 edge --db /var/lib/edge-router/state.sqlite \
-  --home-cidr 10.10.40.0/24 \
+  --target-cidr 10.10.40.0/24 \
   map create \
   --backend nft \
   --mode port_forward_snat \
@@ -152,7 +146,7 @@ edge --db /var/lib/edge-router/state.sqlite \
 Only apply after dry-run and check look correct:
 
 ```sh
-sudo edge --db /var/lib/edge-router/state.sqlite --home-cidr 192.168.20.0/24 apply
+sudo edge --config /etc/edge-router/config.toml --db /var/lib/edge-router/state.sqlite apply
 ```
 
 ## Experimental XDP Planning
@@ -161,7 +155,7 @@ Use `backend=xdp` only when you want to inspect the future XDP fast-path plan. X
 
 ```sh
 edge --db /var/lib/edge-router/state.sqlite \
-  --home-cidr 10.10.40.0/24 \
+  --target-cidr 10.10.40.0/24 \
   map create \
   --backend xdp \
   --mode port_forward_snat \
@@ -178,7 +172,7 @@ Inspect the XDP plan with dry-run:
 
 ```sh
 edge --db /var/lib/edge-router/state.sqlite \
-  --home-cidr 10.10.40.0/24 \
+  --target-cidr 10.10.40.0/24 \
   reconcile \
   --dry-run \
   --enable-xdp \
@@ -201,4 +195,6 @@ Re-run `edge apply --dry-run`, `edge apply --check`, then `edge apply` after all
 
 For reserved public IP reuse, the safe sequence is: list reusable `RESERVED` regional public IPs with no `private-ip-id`, create the new private IP on the forwarding VNIC, assign the existing public IP to that private IP, update SQLite, then dry-run and validate nftables before applying. If the SQLite update fails, unassign the reused public IP rather than deleting it.
 
-Sources: [Tailscale subnet routers](https://tailscale.com/docs/features/subnet-routers), [Tailscale firewall mode](https://tailscale.com/docs/features/firewall-mode), [OCI public IPs](https://docs.oracle.com/en-us/iaas/Content/Network/Tasks/managingpublicIPs.htm), [OCI private IPs](https://docs.oracle.com/en-us/iaas/Content/Network/Tasks/managingIPaddresses.htm), [nftables project](https://www.netfilter.org/projects/nftables/index.html).
+See also the [NetBird migration runbook](netbird-migration.md).
+
+Sources: [NetBird routing peers](https://docs.netbird.io/manage/networks/how-routing-peers-work), [NetBird ports and firewalls](https://docs.netbird.io/about-netbird/ports-and-firewalls), [OCI public IPs](https://docs.oracle.com/en-us/iaas/Content/Network/Tasks/managingpublicIPs.htm), [OCI private IPs](https://docs.oracle.com/en-us/iaas/Content/Network/Tasks/managingIPaddresses.htm), [nftables project](https://www.netfilter.org/projects/nftables/index.html).

@@ -17,7 +17,7 @@ edge-nft = { path = "../edge-nft" }
 edge-oci = { path = "../edge-oci" }
 edge-reconcile = { path = "../edge-reconcile" }
 edge-store = { path = "../edge-store" }
-edge-tailscale = { path = "../edge-tailscale" }
+edge-netbird = { path = "../edge-netbird" }
 edge-xdp = { path = "../edge-xdp" }
 ipnet.workspace = true
 serde.workspace = true

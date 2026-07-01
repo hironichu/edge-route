@@ -86,25 +86,18 @@ If database state is lost, recover OCIDs from `edge map list`, OCI Console, or:
 edge oracle ip list --compartment-id <compartment_ocid>
 ```
 
-## Tailscale Route Recovery
+## NetBird Network Recovery
 
-On the home subnet router:
-
-```sh
-sudo tailscale up --advertise-routes=192.168.20.0/24
-tailscale status
-```
-
-Approve the subnet route in the admin console if it was disabled. On the edge host:
+Confirm the NetBird Network resources still contain the expected CIDRs, the correct home routing peer is assigned, and a policy permits the edge peer to reach them. On the routing peer, verify IPv4 forwarding. On the edge host:
 
 ```sh
-tailscale status
-edge tailscale routes
-edge tailscale check 192.168.20.42 --ping
-ip route get 192.168.20.42
+netbird status
+edge netbird networks
+edge netbird check 10.10.40.89 --ping
+ip route get 10.10.40.89
 ```
 
-The route should use `tailscale0`. If it does not, fix Tailscale route approval/acceptance before touching nftables.
+The route should use `wt0`, optionally through `table netbird`. If it does not, fix the NetBird resource, routing-peer assignment, and policy before touching nftables.
 
 ## Kernel Or nft Failure
 

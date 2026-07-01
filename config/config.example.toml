@@ -1,6 +1,6 @@
-wan_interface = "ens3"
-tailscale_interface = "tailscale0"
-home_cidrs = ["192.168.20.0/24"]
+wan_interface = "enp0s6"
+netbird_interface = "wt0"
+target_cidrs = ["10.10.30.0/24", "10.10.40.0/24", "10.10.50.0/24"]
 
 # Required for authenticated edge-agent API.
 # Prefer EDGE_API_TOKEN in /etc/edge-router/edge-agent.env for production.

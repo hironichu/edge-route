@@ -27,7 +27,7 @@ Supported:
 - `protocol=udp`
 - explicit `public_port`
 - explicit `target_port`
-- target IP inside configured `home_cidrs`
+- target IP inside configured `target_cidrs`
 
 Not supported:
 
@@ -41,7 +41,7 @@ Not supported:
 
 ```sh
 edge --db /var/lib/edge-router/state.sqlite \
-  --home-cidr 10.10.40.0/24 \
+  --target-cidr 10.10.40.0/24 \
   map create \
   --backend xdp \
   --mode port_forward_snat \
@@ -60,7 +60,7 @@ Dry-run with XDP explicitly enabled:
 
 ```sh
 edge --db /var/lib/edge-router/state.sqlite \
-  --home-cidr 10.10.40.0/24 \
+  --target-cidr 10.10.40.0/24 \
   reconcile \
   --dry-run \
   --enable-xdp \

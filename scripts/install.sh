@@ -45,13 +45,13 @@ install_packages() {
         apt)
             export DEBIAN_FRONTEND=noninteractive
             apt-get update
-            apt-get install -y --no-install-recommends ca-certificates curl tar openssl iproute2 nftables
+            apt-get install -y --no-install-recommends ca-certificates curl jq tar openssl iproute2 nftables
             ;;
         dnf)
-            dnf install -y ca-certificates curl tar openssl iproute nftables
+            dnf install -y ca-certificates curl jq tar openssl iproute nftables
             ;;
         yum)
-            yum install -y ca-certificates curl tar openssl iproute nftables
+            yum install -y ca-certificates curl jq tar openssl iproute nftables
             ;;
         *)
             warn "no supported package manager found; assuming required packages are already installed"
@@ -76,46 +76,31 @@ detect_wan_interface() {
         | awk '{ for (i = 1; i <= NF; i++) if ($i == "dev") { print $(i + 1); exit } }'
 }
 
-detect_tailscale_interface() {
-    if [ -n "${EDGE_TAILSCALE_INTERFACE:-}" ]; then
-        echo "$EDGE_TAILSCALE_INTERFACE"
+detect_netbird_interface() {
+    if [ -n "${EDGE_NETBIRD_INTERFACE:-}" ]; then
+        echo "$EDGE_NETBIRD_INTERFACE"
         return
     fi
 
-    if ip link show tailscale0 >/dev/null 2>&1; then
-        echo "tailscale0"
+    if ip link show wt0 >/dev/null 2>&1; then
+        echo "wt0"
         return
     fi
 
     ip -o link show 2>/dev/null \
-        | awk -F': ' '$2 ~ /^tailscale[0-9]*/ { print $2; exit }'
+        | awk -F': ' '$2 ~ /^wt[0-9]+$/ { print $2; exit }'
 }
 
-detect_home_cidrs() {
-    local tailscale_interface="$1"
-
-    if [ -n "${EDGE_HOME_CIDRS:-}" ]; then
-        echo "$EDGE_HOME_CIDRS"
+detect_target_cidrs() {
+    if [ -n "${EDGE_TARGET_CIDRS:-}" ]; then
+        echo "$EDGE_TARGET_CIDRS"
         return
     fi
 
-    if [ -n "$tailscale_interface" ]; then
-        { ip -4 route show table all dev "$tailscale_interface" 2>/dev/null || true; } \
-            | awk '
-                $1 ~ /^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+\/[0-9]+$/ &&
-                $1 != "100.64.0.0/10" &&
-                $1 != "169.254.0.0/16" {
-                    if (!seen[$1]++) {
-                        if (out != "") out = out ","
-                        out = out $1
-                    }
-                }
-                END { print out }
-            '
-        return
-    fi
-
-    echo ""
+    netbird status --json 2>/dev/null \
+        | jq -r '.peers.details[]?.networks[]?' \
+        | sort -u \
+        | paste -sd, -
 }
 
 toml_array() {
@@ -138,10 +123,14 @@ toml_array() {
 write_config_if_missing() {
     local config_file="$1"
     local wan_interface="$2"
-    local tailscale_interface="$3"
-    local home_cidrs="$4"
+    local netbird_interface="$3"
+    local target_cidrs="$4"
 
     if [ -f "$config_file" ] && [ "${EDGE_OVERWRITE_CONFIG:-0}" != "1" ]; then
+        if ! grep -q '^[[:space:]]*netbird_interface[[:space:]]*=' "$config_file" \
+            || ! grep -q '^[[:space:]]*target_cidrs[[:space:]]*=' "$config_file"; then
+            die "existing $config_file does not use the NetBird config contract; update it manually or back it up and set EDGE_OVERWRITE_CONFIG=1"
+        fi
         info "keeping existing $config_file"
         return
     fi
@@ -150,8 +139,8 @@ write_config_if_missing() {
     umask 027
     {
         printf 'wan_interface = "%s"\n' "$wan_interface"
-        printf 'tailscale_interface = "%s"\n' "$tailscale_interface"
-        printf 'home_cidrs = %s\n' "$(toml_array "$home_cidrs")"
+        printf 'netbird_interface = "%s"\n' "$netbird_interface"
+        printf 'target_cidrs = %s\n' "$(toml_array "$target_cidrs")"
         printf '\n'
         printf '# Optional OCI defaults used by CLI/API provisioning.\n'
         printf '# oci_compartment_id = "ocid1.compartment..."\n'
@@ -209,8 +198,8 @@ main() {
     local tmpdir
     local package_dir
     local wan_interface
-    local tailscale_interface
-    local home_cidrs
+    local netbird_interface
+    local target_cidrs
 
     install_packages
 
@@ -218,6 +207,8 @@ main() {
     need_cmd tar
     need_cmd install
     need_cmd ip
+    need_cmd jq
+    need_cmd netbird
     need_cmd nft
     need_cmd openssl
     need_cmd systemctl
@@ -236,14 +227,11 @@ main() {
     wan_interface="$(detect_wan_interface)"
     [ -n "$wan_interface" ] || die "could not detect WAN interface; set EDGE_WAN_INTERFACE"
 
-    tailscale_interface="$(detect_tailscale_interface)"
-    [ -n "$tailscale_interface" ] || die "could not detect Tailscale interface; set EDGE_TAILSCALE_INTERFACE"
+    netbird_interface="$(detect_netbird_interface)"
+    [ -n "$netbird_interface" ] || die "could not detect NetBird interface; set EDGE_NETBIRD_INTERFACE"
 
-    home_cidrs="$(detect_home_cidrs "$tailscale_interface")"
-    if [ -z "$home_cidrs" ]; then
-        home_cidrs="192.168.0.0/16"
-        warn "could not detect home CIDRs through $tailscale_interface; using $home_cidrs. Override with EDGE_HOME_CIDRS."
-    fi
+    target_cidrs="$(detect_target_cidrs)"
+    [ -n "$target_cidrs" ] || die "could not detect routed NetBird networks; set EDGE_TARGET_CIDRS explicitly"
 
     verify_nft_parser
 
@@ -266,7 +254,7 @@ main() {
     install -m 0755 "$package_dir/edge" /usr/local/bin/edge
     install -m 0755 "$package_dir/edge-agent" /usr/local/bin/edge-agent
     install -d -m 0750 /var/lib/edge-router /run/edge-router /etc/edge-router
-    write_config_if_missing /etc/edge-router/config.toml "$wan_interface" "$tailscale_interface" "$home_cidrs"
+    write_config_if_missing /etc/edge-router/config.toml "$wan_interface" "$netbird_interface" "$target_cidrs"
     write_env_if_missing /etc/edge-router/edge-agent.env
     install -m 0644 "$package_dir/systemd/edge-agent.service" /etc/systemd/system/edge-agent.service
 
@@ -282,8 +270,8 @@ main() {
 
     info "installed EdgeRoute ${version}"
     info "detected wan_interface=${wan_interface}"
-    info "detected tailscale_interface=${tailscale_interface}"
-    info "configured home_cidrs=${home_cidrs}"
+    info "detected netbird_interface=${netbird_interface}"
+    info "configured target_cidrs=${target_cidrs}"
 }
 
 main "$@"

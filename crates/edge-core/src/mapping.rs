@@ -153,8 +153,8 @@ impl FromStr for OciAuthMode {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EdgeConfig {
     pub wan_interface: String,
-    pub tailscale_interface: String,
-    pub home_cidrs: Vec<Ipv4Net>,
+    pub netbird_interface: String,
+    pub target_cidrs: Vec<Ipv4Net>,
     pub oci_compartment_id: Option<String>,
     pub oci_vnic_id: Option<String>,
     pub oci_subnet_id: Option<String>,
@@ -169,13 +169,13 @@ pub struct EdgeConfig {
 impl EdgeConfig {
     pub fn new(
         wan_interface: impl Into<String>,
-        tailscale_interface: impl Into<String>,
-        home_cidrs: Vec<Ipv4Net>,
+        netbird_interface: impl Into<String>,
+        target_cidrs: Vec<Ipv4Net>,
     ) -> Self {
         Self {
             wan_interface: wan_interface.into(),
-            tailscale_interface: tailscale_interface.into(),
-            home_cidrs,
+            netbird_interface: netbird_interface.into(),
+            target_cidrs,
             oci_compartment_id: None,
             oci_vnic_id: None,
             oci_subnet_id: None,
@@ -186,8 +186,8 @@ impl EdgeConfig {
         }
     }
 
-    pub fn contains_home_target(&self, ip: Ipv4Addr) -> bool {
-        self.home_cidrs.iter().any(|cidr| cidr.contains(&ip))
+    pub fn contains_target(&self, ip: Ipv4Addr) -> bool {
+        self.target_cidrs.iter().any(|cidr| cidr.contains(&ip))
     }
 }
 

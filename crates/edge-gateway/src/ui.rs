@@ -8,7 +8,7 @@ use axum::http::header::{CONTENT_DISPOSITION, CONTENT_TYPE};
 use axum::response::{Html, IntoResponse};
 use axum::Form;
 use edge_core::{Event, Mapping};
-use edge_tailscale::TailscaleStatus;
+use edge_netbird::NetbirdStatus;
 use maud::{html, Markup};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -45,7 +45,8 @@ pub struct ReconcileForm {
 #[derive(Debug, Deserialize)]
 struct StatusResponse {
     wan_interface: String,
-    tailscale_interface: String,
+    netbird_interface: String,
+    target_cidrs: Vec<String>,
     mappings: usize,
     enabled_mappings: usize,
 }
@@ -62,8 +63,8 @@ struct ReconcileResponse {
 #[derive(Debug, Deserialize)]
 struct TopologyResponse {
     wan_interface: String,
-    tailscale_interface: String,
-    home_cidrs: Vec<String>,
+    netbird_interface: String,
+    target_cidrs: Vec<String>,
     flows: Vec<TopologyFlow>,
 }
 
@@ -93,6 +94,14 @@ struct OciStatusResponse {
     env: OciEnvStatus,
     cli_available: bool,
     cli_version: Option<String>,
+    #[serde(default)]
+    compartment_id: Option<String>,
+    #[serde(default)]
+    vnic_id: Option<String>,
+    #[serde(default)]
+    subnet_id: Option<String>,
+    #[serde(default)]
+    nsg_ids: Vec<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -247,7 +256,202 @@ pub async fn topology(State(state): State<AppState>) -> impl IntoResponse {
 }
 
 pub async fn oracle(State(state): State<AppState>) -> impl IntoResponse {
-    render_result(oracle_markup(&state).await)
+    render_result(oracle_markup(&state, None).await)
+}
+
+#[derive(Debug, Deserialize)]
+pub struct OracleAllocateForm {
+    mapping_id: String,
+    compartment_id: Option<String>,
+    vnic_id: Option<String>,
+    display_name: Option<String>,
+    confirm: String,
+}
+
+pub async fn oracle_allocate(
+    State(state): State<AppState>,
+    Form(form): Form<OracleAllocateForm>,
+) -> impl IntoResponse {
+    render_result(
+        async {
+            let body = json!({
+                "mapping_id": form.mapping_id.trim(),
+                "compartment_id": clean_opt(form.compartment_id),
+                "vnic_id": clean_opt(form.vnic_id),
+                "display_name": clean_opt(form.display_name),
+                "confirm": form.confirm,
+            });
+            let result =
+                agent::post_json::<serde_json::Value, _>(&state, "/v1/oci/allocate", &body).await;
+            oracle_markup(&state, Some(action_result("Allocate", result))).await
+        }
+        .await,
+    )
+}
+
+#[derive(Debug, Deserialize)]
+pub struct OracleReleaseForm {
+    mapping_id: Option<String>,
+    public_ip_id: Option<String>,
+    private_ip_id: Option<String>,
+    confirm: String,
+}
+
+pub async fn oracle_release(
+    State(state): State<AppState>,
+    Form(form): Form<OracleReleaseForm>,
+) -> impl IntoResponse {
+    render_result(
+        async {
+            let body = json!({
+                "mapping_id": clean_opt(form.mapping_id),
+                "public_ip_id": clean_opt(form.public_ip_id),
+                "private_ip_id": clean_opt(form.private_ip_id),
+                "confirm": form.confirm,
+            });
+            let result =
+                agent::post_json::<serde_json::Value, _>(&state, "/v1/oci/release", &body).await;
+            oracle_markup(&state, Some(action_result("Release", result))).await
+        }
+        .await,
+    )
+}
+
+#[derive(Debug, Deserialize)]
+pub struct OracleVnicForm {
+    vnic_id: Option<String>,
+}
+
+pub async fn oracle_vnic_check(
+    State(state): State<AppState>,
+    Form(form): Form<OracleVnicForm>,
+) -> impl IntoResponse {
+    render_result(
+        async {
+            let path = with_query("/v1/oci/vnic/check", "vnic_id", clean_opt(form.vnic_id));
+            let result = agent::get_json::<serde_json::Value>(&state, &path).await;
+            oracle_markup(&state, Some(action_result("VNIC Check", result))).await
+        }
+        .await,
+    )
+}
+
+#[derive(Debug, Deserialize)]
+pub struct OraclePublicIpsForm {
+    compartment_id: Option<String>,
+}
+
+pub async fn oracle_public_ips(
+    State(state): State<AppState>,
+    Form(form): Form<OraclePublicIpsForm>,
+) -> impl IntoResponse {
+    render_result(
+        async {
+            let path = with_query(
+                "/v1/oci/public-ips",
+                "compartment_id",
+                clean_opt(form.compartment_id),
+            );
+            let result = agent::get_json::<serde_json::Value>(&state, &path).await;
+            oracle_markup(&state, Some(action_result("Public IPs", result))).await
+        }
+        .await,
+    )
+}
+
+#[derive(Debug, Deserialize)]
+pub struct OracleNsgAddForm {
+    nsg_id: Option<String>,
+    protocol: String,
+    source: String,
+    port_min: Option<String>,
+    port_max: Option<String>,
+    description: Option<String>,
+    confirm: String,
+}
+
+pub async fn oracle_nsg_add(
+    State(state): State<AppState>,
+    Form(form): Form<OracleNsgAddForm>,
+) -> impl IntoResponse {
+    render_result(
+        async {
+            let body = json!({
+                "nsg_id": clean_opt(form.nsg_id),
+                "protocol": form.protocol,
+                "source": form.source.trim(),
+                "port_min": clean_port(form.port_min)?,
+                "port_max": clean_port(form.port_max)?,
+                "description": clean_opt(form.description),
+                "confirm": form.confirm,
+            });
+            let result =
+                agent::post_json::<serde_json::Value, _>(&state, "/v1/oci/nsg/add", &body).await;
+            oracle_markup(&state, Some(action_result("NSG Add Rule", result))).await
+        }
+        .await,
+    )
+}
+
+#[derive(Debug, Deserialize)]
+pub struct OracleNsgRemoveForm {
+    nsg_id: Option<String>,
+    rule_ids: String,
+    confirm: String,
+}
+
+pub async fn oracle_nsg_remove(
+    State(state): State<AppState>,
+    Form(form): Form<OracleNsgRemoveForm>,
+) -> impl IntoResponse {
+    render_result(
+        async {
+            let rule_ids: Vec<String> = form
+                .rule_ids
+                .split([',', '\n', ' '])
+                .map(str::trim)
+                .filter(|id| !id.is_empty())
+                .map(str::to_owned)
+                .collect();
+            let body = json!({
+                "nsg_id": clean_opt(form.nsg_id),
+                "rule_ids": rule_ids,
+                "confirm": form.confirm,
+            });
+            let result =
+                agent::post_json::<serde_json::Value, _>(&state, "/v1/oci/nsg/remove", &body).await;
+            oracle_markup(&state, Some(action_result("NSG Remove Rule", result))).await
+        }
+        .await,
+    )
+}
+
+struct OracleResult {
+    title: String,
+    ok: bool,
+    body: String,
+}
+
+fn action_result(title: &str, result: Result<serde_json::Value, GatewayError>) -> OracleResult {
+    match result {
+        Ok(value) => OracleResult {
+            title: title.to_owned(),
+            ok: true,
+            body: serde_json::to_string_pretty(&value).unwrap_or_else(|_| value.to_string()),
+        },
+        Err(error) => OracleResult {
+            title: title.to_owned(),
+            ok: false,
+            body: error.message,
+        },
+    }
+}
+
+fn with_query(path: &str, key: &str, value: Option<String>) -> String {
+    match value {
+        Some(value) => format!("{path}?{key}={value}"),
+        None => path.to_owned(),
+    }
 }
 
 pub async fn tools_dry_run(State(state): State<AppState>) -> impl IntoResponse {
@@ -436,8 +640,8 @@ pub async fn tcpdump_tool(
     )
 }
 
-pub async fn tailscale(State(state): State<AppState>) -> impl IntoResponse {
-    render_result(tailscale_markup(&state).await)
+pub async fn netbird(State(state): State<AppState>) -> impl IntoResponse {
+    render_result(netbird_markup(&state).await)
 }
 
 pub async fn events(State(state): State<AppState>) -> impl IntoResponse {
@@ -468,30 +672,31 @@ async fn dashboard_markup(state: &AppState) -> Result<Markup, GatewayError> {
     let events: Vec<Event> = agent::get_json(state, "/v1/events")
         .await
         .unwrap_or_default();
-    let tailscale: Option<TailscaleStatus> =
-        agent::get_json(state, "/v1/tailscale/status").await.ok();
-    let routes: Vec<String> = agent::get_json(state, "/v1/tailscale/routes")
+    let netbird: Option<NetbirdStatus> = agent::get_json(state, "/v1/netbird/status").await.ok();
+    let networks: Vec<String> = agent::get_json(state, "/v1/netbird/networks")
         .await
         .unwrap_or_default();
     let mapping_status_counts = count_by(mappings.iter().map(mapping_status));
     let backends = count_by(mappings.iter().map(|mapping| wire_name(&mapping.backend)));
-    let online_peers = tailscale
+    let healthy_peers = netbird
         .as_ref()
         .map(|status| {
             status
                 .peers
-                .values()
-                .filter(|peer| peer.online == Some(true))
+                .details
+                .iter()
+                .filter(|peer| peer.is_healthy())
                 .count()
         })
         .unwrap_or_default();
-    let offline_peers = tailscale
+    let unhealthy_peers = netbird
         .as_ref()
         .map(|status| {
             status
                 .peers
-                .values()
-                .filter(|peer| peer.online == Some(false))
+                .details
+                .iter()
+                .filter(|peer| !peer.is_healthy())
                 .count()
         })
         .unwrap_or_default();
@@ -509,15 +714,23 @@ async fn dashboard_markup(state: &AppState) -> Result<Markup, GatewayError> {
     {
         alerts.push("warning/error events recorded".to_owned());
     }
-    if offline_peers > 0 {
-        alerts.push(format!("{offline_peers} Tailscale peer(s) offline"));
+    if unhealthy_peers > 0 {
+        alerts.push(format!("{unhealthy_peers} NetBird peer(s) disconnected"));
     }
-    if tailscale
+    if netbird.is_none() {
+        alerts.push("NetBird status is unavailable".to_owned());
+    }
+    if netbird
         .as_ref()
-        .and_then(|status| status.backend_state.as_deref())
-        .is_some_and(|state| state != "Running")
+        .is_some_and(|status| !status.daemon_connected())
     {
-        alerts.push("Tailscale backend is not Running".to_owned());
+        alerts.push("NetBird daemon is not connected".to_owned());
+    }
+    if netbird
+        .as_ref()
+        .is_some_and(|status| !status.management.connected || !status.signal.connected)
+    {
+        alerts.push("NetBird control service is disconnected".to_owned());
     }
     Ok(html! {
         (page_head("Dashboard", "Control plane state", html! {
@@ -533,9 +746,10 @@ async fn dashboard_markup(state: &AppState) -> Result<Markup, GatewayError> {
             section class="console-section health-section" {
                 header { h2 { "Router Health" } span class="muted" { "live agent snapshot" } }
                 div class="status-strip vertical" {
-                    div { span class="label" { "Tailscale" } strong { (tailscale.as_ref().and_then(|t| t.backend_state.as_deref()).unwrap_or("unknown")) } small { (&status.tailscale_interface) } }
-                    div { span class="label" { "Advertised Routes" } strong { (routes.len()) } small { (join_or_dash(&routes)) } }
-                    div { span class="label" { "Peers Online" } strong { (online_peers) "/" (online_peers + offline_peers) } small { "from tailscale status" } }
+                    div { span class="label" { "NetBird" } strong { (netbird.as_ref().and_then(|t| t.daemon_status.as_deref()).unwrap_or("unknown")) } small { (&status.netbird_interface) } }
+                    div { span class="label" { "Advertised Networks" } strong { (networks.len()) } small { (join_or_dash(&networks)) } }
+                    div { span class="label" { "Target CIDRs" } strong { (status.target_cidrs.len()) } small { (join_or_dash(&status.target_cidrs)) } }
+                    div { span class="label" { "Peers Healthy" } strong { (healthy_peers) "/" (healthy_peers + unhealthy_peers) } small { "connected or idle" } }
                     div { span class="label" { "Rule Coverage" } strong { (status.enabled_mappings) "/" (status.mappings) } small { "enabled mappings" } }
                 }
             }
@@ -562,10 +776,10 @@ async fn dashboard_markup(state: &AppState) -> Result<Markup, GatewayError> {
                 div class="card-body" { (bar_chart(&backends)) }
             }
             section class="console-section chart-card" {
-                header { h2 { "Tailnet Peer State" } }
+                header { h2 { "NetBird Peer State" } }
                 div class="card-body" { (bar_chart(&BTreeMap::from([
-                    ("online".to_owned(), online_peers),
-                    ("offline".to_owned(), offline_peers),
+                    ("healthy".to_owned(), healthy_peers),
+                    ("disconnected".to_owned(), unhealthy_peers),
                 ]))) }
             }
             section class="console-section logs-preview" {
@@ -578,7 +792,7 @@ async fn dashboard_markup(state: &AppState) -> Result<Markup, GatewayError> {
                     div class="tool-links" {
                         a class="btn" href="/tools" hx-get="/ui/tools" hx-target="#view" hx-swap="innerHTML transition:true" hx-push-url="/tools" { "Diagnostics" }
                         a class="btn" href="/mappings" hx-get="/ui/mappings" hx-target="#view" hx-swap="innerHTML transition:true" hx-push-url="/mappings" { "Mappings" }
-                        a class="btn" href="/tailscale" hx-get="/ui/tailscale" hx-target="#view" hx-swap="innerHTML transition:true" hx-push-url="/tailscale" { "Tailscale" }
+                        a class="btn" href="/netbird" hx-get="/ui/netbird" hx-target="#view" hx-swap="innerHTML transition:true" hx-push-url="/netbird" { "NetBird" }
                         a class="btn" href="/reconcile" hx-get="/ui/reconcile" hx-target="#view" hx-swap="innerHTML transition:true" hx-push-url="/reconcile" { "Reconcile" }
                     }
                 }
@@ -668,7 +882,7 @@ async fn mappings_markup(state: &AppState) -> Result<Markup, GatewayError> {
             section class="console-section section-spaced" {
                 header {
                     h2 { "Path" }
-                    span class="muted" { (&topology.wan_interface) " -> " (&topology.tailscale_interface) }
+                    span class="muted" { (&topology.wan_interface) " -> " (&topology.netbird_interface) }
                 }
                 (binding_diagrams(&topology.flows))
             }
@@ -738,8 +952,8 @@ async fn topology_markup(state: &AppState) -> Result<Markup, GatewayError> {
         }))
         div class="summary-row" {
             (summary_item("WAN", &topology.wan_interface, "public side"))
-            (summary_item("Tailnet", &topology.tailscale_interface, "private side"))
-            (summary_item("Home CIDRs", &topology.home_cidrs.len().to_string(), &join_or_dash(&topology.home_cidrs)))
+            (summary_item("NetBird", &topology.netbird_interface, "private side"))
+            (summary_item("Target CIDRs", &topology.target_cidrs.len().to_string(), &join_or_dash(&topology.target_cidrs)))
             (summary_item("Binds", &topology.flows.len().to_string(), "configured flows"))
         }
         section class="console-section section-spaced" {
@@ -749,13 +963,36 @@ async fn topology_markup(state: &AppState) -> Result<Markup, GatewayError> {
     })
 }
 
-async fn oracle_markup(state: &AppState) -> Result<Markup, GatewayError> {
+async fn oracle_markup(
+    state: &AppState,
+    result: Option<OracleResult>,
+) -> Result<Markup, GatewayError> {
     let oci: OciStatusResponse = agent::get_json(state, "/v1/oci/status").await?;
+    let mappings: Vec<Mapping> = agent::get_json(state, "/v1/mappings")
+        .await
+        .unwrap_or_default();
     let needs_api_key = oci.auth_mode == "api_key" && !oci.api_key_env_ready;
+    let compartment = oci.compartment_id.clone().unwrap_or_default();
+    let vnic = oci.vnic_id.clone().unwrap_or_default();
+    let nsg = oci.nsg_ids.first().cloned().unwrap_or_default();
+    let allocatable: Vec<&Mapping> = mappings
+        .iter()
+        .filter(|mapping| mapping.public_ip.is_none() && mapping.oci_public_ip_ocid.is_none())
+        .collect();
+    let allocated: Vec<&Mapping> = mappings
+        .iter()
+        .filter(|mapping| mapping.oci_public_ip_ocid.is_some())
+        .collect();
     Ok(html! {
         (page_head("Oracle", "OCI CLI and allocation readiness", html! {
             button class="btn" hx-get="/ui/oracle" hx-target="#view" hx-swap="innerHTML transition:true" { "Refresh" }
         }))
+        @if let Some(result) = &result {
+            section class=(format!("console-section section-spaced oracle-result {}", if result.ok { "ok" } else { "err" })) {
+                header { h2 { (result.title) " — " (if result.ok { "ok" } else { "failed" }) } }
+                pre class="code" { (result.body) }
+            }
+        }
         div class="summary-row" {
             (summary_item("Auth Mode", &oci.auth_mode, "edge config"))
             (summary_item("Region", oci.region.as_deref().unwrap_or("-"), "OCI region"))
@@ -796,7 +1033,104 @@ async fn oracle_markup(state: &AppState) -> Result<Markup, GatewayError> {
                 }
             }
         }
+        section class="console-section section-spaced" {
+            header { h2 { "Allocation Control" } span class="muted" { "public IP to edge private IP to local target" } }
+            div class="split-layout oracle-split" {
+                div {
+                    h3 { "Allocate public + private IP" }
+                    @if allocatable.is_empty() {
+                        p class="muted" { "No unallocated mappings. Create a mapping first." }
+                    } @else {
+                        form hx-post="/ui/oracle/allocate" hx-target="#view" hx-swap="innerHTML transition:true" {
+                            label class="field" { span { "Mapping" } select name="mapping_id" required {
+                                @for mapping in &allocatable {
+                                    option value=(mapping.id.as_str()) { (&mapping.name) " (" (mapping.id.as_str()) ")" }
+                                }
+                            } }
+                            label class="field" { span { "Compartment OCID" } input name="compartment_id" value=(compartment) placeholder="from config"; }
+                            label class="field" { span { "VNIC OCID" } input name="vnic_id" value=(vnic) placeholder="from config"; }
+                            label class="field" { span { "Display name" } input name="display_name" placeholder="defaults to mapping name"; }
+                            (confirm_field("confirm", "allocate"))
+                            button class="primary" type="submit" data-confirm-submit disabled { "Allocate" }
+                        }
+                    }
+                }
+                div {
+                    h3 { "Release allocation" }
+                    @if allocated.is_empty() {
+                        p class="muted" { "No allocated mappings to release." }
+                    } @else {
+                        form hx-post="/ui/oracle/release" hx-target="#view" hx-swap="innerHTML transition:true" {
+                            label class="field" { span { "Mapping" } select name="mapping_id" required {
+                                @for mapping in &allocated {
+                                    option value=(mapping.id.as_str()) { (&mapping.name) " (" (endpoint(mapping.public_ip.map(|ip| ip.to_string()), mapping.public_port)) ")" }
+                                }
+                            } }
+                            (confirm_field("delete", "delete"))
+                            button class="danger" type="submit" data-confirm-submit disabled { "Release (deletes OCI IPs)" }
+                        }
+                    }
+                }
+            }
+        }
+        section class="console-section section-spaced" {
+            header { h2 { "VNIC and Inventory" } }
+            div class="split-layout oracle-split" {
+                div {
+                    h3 { "Forwarding VNIC check" }
+                    form hx-post="/ui/oracle/vnic-check" hx-target="#view" hx-swap="innerHTML transition:true" {
+                        label class="field" { span { "VNIC OCID" } input name="vnic_id" value=(vnic) placeholder="from config"; }
+                        button class="btn" type="submit" { "Check skip-source-dest-check" }
+                    }
+                }
+                div {
+                    h3 { "List reserved public IPs" }
+                    form hx-post="/ui/oracle/public-ips" hx-target="#view" hx-swap="innerHTML transition:true" {
+                        label class="field" { span { "Compartment OCID" } input name="compartment_id" value=(compartment) placeholder="from config"; }
+                        button class="btn" type="submit" { "List Public IPs" }
+                    }
+                }
+            }
+        }
+        section class="console-section section-spaced" {
+            header { h2 { "NSG Ingress Rules" } span class="muted" { "open the OCI firewall for a forward" } }
+            div class="split-layout oracle-split" {
+                div {
+                    h3 { "Add ingress rule" }
+                    form hx-post="/ui/oracle/nsg/add" hx-target="#view" hx-swap="innerHTML transition:true" {
+                        label class="field" { span { "NSG OCID" } input name="nsg_id" value=(nsg) placeholder="from config"; }
+                        label class="field" { span { "Protocol" } select name="protocol" { option value="tcp" { "tcp" } option value="udp" { "udp" } option value="all" { "all" } } }
+                        label class="field" { span { "Source CIDR" } input name="source" required value="0.0.0.0/0"; }
+                        label class="field" { span { "Port min" } input name="port_min" type="number" min="1" max="65535"; }
+                        label class="field" { span { "Port max" } input name="port_max" type="number" min="1" max="65535"; }
+                        label class="field" { span { "Description" } input name="description" placeholder="EdgeRoute forward"; }
+                        (confirm_field("confirm", "add"))
+                        button class="primary" type="submit" data-confirm-submit disabled { "Add Rule" }
+                    }
+                }
+                div {
+                    h3 { "Remove ingress rules" }
+                    form hx-post="/ui/oracle/nsg/remove" hx-target="#view" hx-swap="innerHTML transition:true" {
+                        label class="field" { span { "NSG OCID" } input name="nsg_id" value=(nsg) placeholder="from config"; }
+                        label class="field" { span { "Rule IDs" } input name="rule_ids" required placeholder="comma or space separated"; }
+                        (confirm_field("delete", "delete"))
+                        button class="danger" type="submit" data-confirm-submit disabled { "Remove Rules" }
+                    }
+                }
+            }
+        }
     })
+}
+
+/// A typed-confirmation field. The user must type `word` exactly; client-side JS
+/// gates the submit button (see app.js), and the agent re-checks server-side.
+fn confirm_field(word: &str, action: &str) -> Markup {
+    html! {
+        label class="field confirm-field" {
+            span { "Type \"" (word) "\" to " (action) }
+            input name="confirm" data-confirm-input data-confirm-word=(word) autocomplete="off" placeholder=(word);
+        }
+    }
 }
 
 async fn tools_markup(
@@ -808,7 +1142,7 @@ async fn tools_markup(
     let mappings: Vec<Mapping> = agent::get_json(state, "/v1/mappings")
         .await
         .unwrap_or_default();
-    let routes: Vec<String> = agent::get_json(state, "/v1/tailscale/routes")
+    let networks: Vec<String> = agent::get_json(state, "/v1/netbird/networks")
         .await
         .unwrap_or_default();
     Ok(html! {
@@ -817,8 +1151,8 @@ async fn tools_markup(
         }))
         div class="summary-row" {
             (summary_item("WAN", &status.wan_interface, "agent config"))
-            (summary_item("Tailnet IF", &status.tailscale_interface, "agent config"))
-            (summary_item("Routes", &routes.len().to_string(), "tailscale advertised"))
+            (summary_item("NetBird IF", &status.netbird_interface, "agent config"))
+            (summary_item("Networks", &networks.len().to_string(), "netbird advertised"))
             (summary_item("Mappings", &mappings.len().to_string(), "loaded from agent"))
         }
         div class="tools-layout" data-tabs-scope {
@@ -874,11 +1208,11 @@ async fn tools_markup(
                     section class=(tab_panel_class(active_tab, "inputs")) data-tab-panel="inputs" {
                         h2 { "Route Inputs" }
                         dl class="facts compact" {
-                            dt { "Advertised" } dd class="mono" { (join_or_dash(&routes)) }
+                            dt { "Advertised" } dd class="mono" { (join_or_dash(&networks)) }
                             dt { "Enabled" } dd { (mappings.iter().filter(|mapping| mapping.enabled).count()) }
                             dt { "Problems" } dd { (mappings.iter().filter(|mapping| matches!(mapping_status(mapping).as_str(), "degraded" | "error")).count()) }
                             dt { "WAN" } dd class="mono" { (&status.wan_interface) }
-                            dt { "Tailnet" } dd class="mono" { (&status.tailscale_interface) }
+                            dt { "NetBird" } dd class="mono" { (&status.netbird_interface) }
                         }
                     }
                 }
@@ -903,92 +1237,95 @@ async fn tools_markup(
     })
 }
 
-async fn tailscale_markup(state: &AppState) -> Result<Markup, GatewayError> {
-    let status: TailscaleStatus = agent::get_json(state, "/v1/tailscale/status").await?;
-    let routes: Vec<String> = agent::get_json(state, "/v1/tailscale/routes")
+async fn netbird_markup(state: &AppState) -> Result<Markup, GatewayError> {
+    let status: NetbirdStatus = agent::get_json(state, "/v1/netbird/status").await?;
+    let networks: Vec<String> = agent::get_json(state, "/v1/netbird/networks")
         .await
         .unwrap_or_default();
-    let online = status
+    let healthy = status
         .peers
-        .values()
-        .filter(|peer| peer.online == Some(true))
+        .details
+        .iter()
+        .filter(|peer| peer.is_healthy())
         .count();
-    let offline = status
+    let disconnected = status
         .peers
-        .values()
-        .filter(|peer| peer.online == Some(false))
+        .details
+        .iter()
+        .filter(|peer| !peer.is_healthy())
         .count();
-    let peer_routes = count_by(status.peers.values().map(|peer| {
-        peer.host_name
+    let peer_states = count_by(status.peers.details.iter().map(|peer| {
+        peer.status
             .clone()
-            .unwrap_or_else(|| "unnamed".to_owned())
+            .unwrap_or_else(|| "unknown".to_owned())
+            .to_ascii_lowercase()
     }));
     Ok(html! {
-        (page_head("Tailscale", "Subnet router and peer state", html! {
-            button class="btn" hx-get="/ui/tailscale" hx-target="#view" hx-swap="innerHTML transition:true" { "Refresh" }
+        (page_head("NetBird", "Subnet router and peer state", html! {
+            button class="btn" hx-get="/ui/netbird" hx-target="#view" hx-swap="innerHTML transition:true" { "Refresh" }
         }))
         div class="summary-row" {
-            (summary_item("Backend", status.backend_state.as_deref().unwrap_or("unknown"), "tailscale status"))
-            (summary_item("Peers", &status.peers.len().to_string(), "tailnet nodes"))
-            (summary_item("Online", &online.to_string(), "reachable peers"))
-            (summary_item("Routes", &routes.len().to_string(), "advertised subnets"))
+            (summary_item("Daemon", status.daemon_status.as_deref().unwrap_or("unknown"), "netbird status"))
+            (summary_item("Peers", &status.peers.total.to_string(), "netbird nodes"))
+            (summary_item("Healthy", &healthy.to_string(), "connected or idle"))
+            (summary_item("Networks", &networks.len().to_string(), "advertised subnets"))
         }
         div class="tabs-strip" {
-            a class="active" href="#tailnet-overview" { "Overview" }
-            a href="#tailnet-routes" { "Routes" }
-            a href="#tailnet-peers" { "Peers" }
+            a class="active" href="#netbird-overview" { "Overview" }
+            a href="#netbird-networks" { "Networks" }
+            a href="#netbird-peers" { "Peers" }
         }
-        section id="tailnet-overview" class="console-section section-spaced" {
+        section id="netbird-overview" class="console-section section-spaced" {
             header { h2 { "Overview" } span class="muted" { "local node and peer health" } }
             div class="split-layout" {
                 div {
                     h3 { "Local Node" }
                     dl class="facts" {
-                        dt { "Backend" } dd { (status.backend_state.as_deref().unwrap_or("unknown")) }
-                        @if let Some(node) = &status.self_node {
-                            dt { "Host" } dd { (node.host_name.as_deref().unwrap_or("-")) }
-                            dt { "Tailscale IPs" } dd { (join_or_dash(&node.tailscale_ips)) }
-                            dt { "Online" } dd { (node.online.map(|v| v.to_string()).unwrap_or_else(|| "unknown".to_owned())) }
-                        }
+                        dt { "Host" } dd { (status.fqdn.as_deref().unwrap_or("-")) }
+                        dt { "Daemon" } dd { (status.daemon_status.as_deref().unwrap_or("unknown")) }
+                        dt { "NetBird IPv4" } dd { (status.netbird_ip.as_deref().unwrap_or("-")) }
+                        dt { "NetBird IPv6" } dd { (status.netbird_ipv6.as_deref().unwrap_or("-")) }
+                        dt { "Interface" } dd { (if status.uses_kernel_interface == Some(true) { "kernel" } else { "userspace/unknown" }) }
                     }
                 }
                 div {
                     h3 { "Peer Availability" }
                     (bar_chart(&BTreeMap::from([
-                        ("online".to_owned(), online),
-                        ("offline".to_owned(), offline),
+                        ("healthy".to_owned(), healthy),
+                        ("disconnected".to_owned(), disconnected),
                     ])))
                 }
                 div {
                     h3 { "Peer Inventory" }
-                    (bar_chart(&peer_routes))
+                    (bar_chart(&peer_states))
                 }
             }
         }
-        section id="tailnet-routes" class="console-section section-spaced" {
-            header { h2 { "Advertised Routes" } span class="muted" { (routes.len()) " routes" } }
-            @if routes.is_empty() {
-                (empty("No advertised subnet routes reported by Tailscale."))
+        section id="netbird-networks" class="console-section section-spaced" {
+            header { h2 { "Advertised Networks" } span class="muted" { (networks.len()) " networks" } }
+            @if networks.is_empty() {
+                (empty("No routed networks reported by NetBird."))
             } @else {
                 div class="route-chips" {
-                    @for route in &routes {
-                        code { (route) }
+                    @for network in &networks {
+                        code { (network) }
                     }
                 }
             }
         }
-        section id="tailnet-peers" class="console-section" {
-            header { h2 { "Peers" } span class="muted" { (status.peers.len()) " peers" } }
+        section id="netbird-peers" class="console-section" {
+            header { h2 { "Peers" } span class="muted" { (status.peers.total) " peers" } }
             div class="table-wrap" {
                 table class="stable-table" {
-                    thead { tr { th { "Host" } th { "State" } th { "Tailscale IPs" } th { "Allowed IPs / Routes" } } }
+                    thead { tr { th { "Host" } th { "State" } th { "IPv4" } th { "IPv6" } th { "Networks" } } }
                     tbody {
-                        @for peer in status.peers.values() {
+                        @for peer in &status.peers.details {
                             tr {
-                                td { (peer.host_name.as_deref().unwrap_or("-")) }
-                                td { (status_pill(match peer.online { Some(true) => "active", Some(false) => "error", None => "pending" })) }
-                                td class="mono" { (join_or_dash(&peer.tailscale_ips)) }
-                                td class="mono wrap" { (join_or_dash(&peer.allowed_ips)) }
+                                td { (peer.fqdn.as_deref().unwrap_or("-")) }
+                                td { (status_pill(if peer.is_healthy() { "active" } else { "error" })) span { (peer.status.as_deref().unwrap_or("unknown")) } }
+                                td class="mono" { (peer.netbird_ip.as_deref().unwrap_or("-")) }
+                                td class="mono" { (peer.netbird_ipv6.as_deref().unwrap_or("-")) }
+                                td class="mono wrap" { (join_or_dash(&peer.networks)) }
                             }
                         }
                     }

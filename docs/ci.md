@@ -78,12 +78,12 @@ Detection and safety behavior:
 - Linux only; x86_64 and arm64 are supported.
 - Requires systemd for the standard service setup.
 - Detects the default WAN interface from the default IPv4 route.
-- Detects `tailscale0` or another `tailscale*` interface.
-- Detects home CIDRs from routes through the Tailscale interface, with `192.168.0.0/16` as a fallback.
+- Detects `wt0` or another `wtN` interface.
+- Detects routed target CIDRs from peer networks in `netbird status --json`; fails closed when none are available unless `EDGE_TARGET_CIDRS` is set.
 - Runs `nft -c` against a minimal ruleset but does not apply firewall rules.
 - Enables `edge-agent` but does not start it unless `EDGE_START_SERVICE=1` is set.
 
-Override detection with `EDGE_WAN_INTERFACE`, `EDGE_TAILSCALE_INTERFACE`, `EDGE_HOME_CIDRS`, `EDGE_REPO`, `EDGE_INSTALL_PACKAGES=0`, or `EDGE_OVERWRITE_CONFIG=1`.
+Override detection with `EDGE_WAN_INTERFACE`, `EDGE_NETBIRD_INTERFACE`, `EDGE_TARGET_CIDRS`, `EDGE_REPO`, `EDGE_INSTALL_PACKAGES=0`, or `EDGE_OVERWRITE_CONFIG=1`.
 
 ## Local Parity
 
